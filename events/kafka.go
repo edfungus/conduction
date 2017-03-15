@@ -9,7 +9,7 @@ import (
 )
 
 type Kafka struct {
-	configs                      Configs
+	configs                      KafkaConfigs
 	broker, topic, consumerGroup string
 
 	producer sarama.SyncProducer
@@ -17,23 +17,31 @@ type Kafka struct {
 
 	messages chan *Message
 	errors   chan error
+
+	createProducer createProducerFunc
+	createConsumer createConsumerFunc
 }
 
-type Configs struct {
+type createProducerFunc func(k *Kafka, producer sarama.SyncProducer) error
+type createConsumerFunc func(k *Kafka, consumer *cluster.Consumer) error
+
+type KafkaConfigs struct {
 	Producer sarama.Config
 	Consumer cluster.Config
 }
 
 // NewKafka creates a new Kafka instance
-func NewKafka(broker string, topic string, consumerGroup string, configs Configs) Kafka {
+func NewKafka(broker string, topic string, consumerGroup string, configs KafkaConfigs) Kafka {
 
 	k := Kafka{
-		configs:       configs,
-		broker:        broker,
-		topic:         topic,
-		consumerGroup: consumerGroup,
-		messages:      make(chan *Message),
-		errors:        make(chan error),
+		configs:        configs,
+		broker:         broker,
+		topic:          topic,
+		consumerGroup:  consumerGroup,
+		messages:       make(chan *Message),
+		errors:         make(chan error),
+		createProducer: createProducer,
+		createConsumer: createConsumer,
 	}
 
 	return k
@@ -47,23 +55,26 @@ func (k *Kafka) Send(msg *Message) error {
 	}
 
 	if k.producer == nil {
-		err = createProducer(k, &k.producer)
+		err = k.createProducer(k, k.producer)
 		if err != nil {
 			return err
 		}
 	}
 
-	k.producer.SendMessage(&sarama.ProducerMessage{
+	_, _, err = k.producer.SendMessage(&sarama.ProducerMessage{
 		Topic: k.topic,
 		Value: sarama.ByteEncoder(out),
 	})
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 // Messages returns a channel to receive messages
 func (k *Kafka) Messages() (<-chan *Message, error) {
 	if k.consumer == nil {
-		err := createConsumer(k, k.consumer)
+		err := k.createConsumer(k, k.consumer)
 		if err != nil {
 			return nil, err
 		}
@@ -72,13 +83,13 @@ func (k *Kafka) Messages() (<-chan *Message, error) {
 		go func() {
 			for {
 				msg := <-k.consumer.Messages()
-				k.consumer.MarkOffset(msg, "")
 				message := &Message{}
 				if err := proto.Unmarshal(msg.Value, message); err != nil {
 					log.Fatalln("Could not parse message to transport.Message")
 					continue
 				}
 				k.messages <- message
+				k.consumer.MarkOffset(msg, "") // This should happen later...
 			}
 		}()
 	}
@@ -88,7 +99,7 @@ func (k *Kafka) Messages() (<-chan *Message, error) {
 // Errors returns a channel to receive messages
 func (k *Kafka) Errors() (<-chan error, error) {
 	if k.consumer == nil {
-		err := createConsumer(k, k.consumer)
+		err := k.createConsumer(k, k.consumer)
 		if err != nil {
 			return nil, err
 		}
@@ -116,12 +127,17 @@ func (k *Kafka) Close() {
 	}
 }
 
-func createProducer(k *Kafka, producer *sarama.SyncProducer) error {
+func (k *Kafka) overrideCreationFuncs(consumerFunc createConsumerFunc, producerFunc createProducerFunc) {
+	k.createConsumer = consumerFunc
+	k.createProducer = producerFunc
+}
+
+func createProducer(k *Kafka, producer sarama.SyncProducer) error {
 	p, err := sarama.NewSyncProducer([]string{k.broker}, &k.configs.Producer)
 	if err != nil {
 		return err
 	}
-	producer = &p
+	producer = p
 	return nil
 }
 
