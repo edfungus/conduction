@@ -6,7 +6,7 @@ import (
 
 	"github.com/Shopify/sarama"
 	cluster "github.com/bsm/sarama-cluster"
-	"github.com/edfungus/conduction/transport"
+	"github.com/edfungus/conduction/events"
 
 	"fmt"
 	"log"
@@ -28,6 +28,8 @@ var (
 func main() {
 	fmt.Println("Hello Conduction!")
 	listen()
+
+	kafka := events.NewKafka()
 }
 
 func listen() {
@@ -53,9 +55,13 @@ func listen() {
 	}
 	defer consumer.Close()
 
+	test := &events.Kafka.Configs{
+
+	}
+
 	go func() {
 		time.Sleep(time.Second * 3)
-		message := &transport.Message{
+		message := &event.Message{
 			Label:  "Hello!!",
 			Number: 30,
 		}
@@ -71,7 +77,7 @@ func listen() {
 			select {
 			case msg := <-consumer.Messages():
 				consumer.MarkOffset(msg, "")
-				message := &transport.Message{}
+				message := &event.Message{}
 				if err := proto.Unmarshal(msg.Value, message); err != nil {
 					log.Fatalln("Could not parse message to transport.Message")
 				}
@@ -94,7 +100,7 @@ func listen() {
 
 }
 
-func send(message *transport.Message, producer sarama.SyncProducer) {
+func send(message *event.Message, producer sarama.SyncProducer) {
 	out, err := proto.Marshal(message)
 	if err != nil {
 		log.Fatalln("Could not marshal transport.Message")

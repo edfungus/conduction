@@ -1,5 +1,5 @@
 syntax="proto3";
-package transport;
+package events;
 
 message Message {
     string label = 1;
