@@ -9,21 +9,10 @@ import (
 )
 
 type Kafka struct {
-	configs                      KafkaConfigs
-	broker, topic, consumerGroup string
-
-	producer sarama.SyncProducer
-	consumer *cluster.Consumer
-
+	interact KafkaInteractions
 	messages chan *Message
 	errors   chan error
-
-	createProducer createProducerFunc
-	createConsumer createConsumerFunc
 }
-
-type createProducerFunc func(k *Kafka, producer sarama.SyncProducer) error
-type createConsumerFunc func(k *Kafka, consumer *cluster.Consumer) error
 
 type KafkaConfigs struct {
 	Producer sarama.Config
@@ -31,20 +20,25 @@ type KafkaConfigs struct {
 }
 
 // NewKafka creates a new Kafka instance
-func NewKafka(broker string, topic string, consumerGroup string, configs KafkaConfigs) Kafka {
-
-	k := Kafka{
-		configs:        configs,
-		broker:         broker,
-		topic:          topic,
-		consumerGroup:  consumerGroup,
-		messages:       make(chan *Message),
-		errors:         make(chan error),
-		createProducer: createProducer,
-		createConsumer: createConsumer,
+func NewKafka(broker string, topic string, consumerGroup string, configs KafkaConfigs) (*Kafka, error) {
+	ki, err := NewKafkaInteract(broker, topic, consumerGroup, configs)
+	if err != nil {
+		return nil, err
 	}
 
-	return k
+	messages := make(chan *Message)
+	errors := make(chan error)
+
+	k := Kafka{
+		interact: ki,
+		messages: messages,
+		errors:   errors,
+	}
+
+	go consumeMessages(messages, ki.Messages())
+	go consumeErrors(errors, ki.Errors())
+
+	return &k, nil
 }
 
 // Send sends a message to the designated topic
@@ -53,18 +47,7 @@ func (k *Kafka) Send(msg *Message) error {
 	if err != nil {
 		return err
 	}
-
-	if k.producer == nil {
-		err = k.createProducer(k, k.producer)
-		if err != nil {
-			return err
-		}
-	}
-
-	_, _, err = k.producer.SendMessage(&sarama.ProducerMessage{
-		Topic: k.topic,
-		Value: sarama.ByteEncoder(out),
-	})
+	err = k.interact.Send(out)
 	if err != nil {
 		return err
 	}
@@ -72,80 +55,37 @@ func (k *Kafka) Send(msg *Message) error {
 }
 
 // Messages returns a channel to receive messages
-func (k *Kafka) Messages() (<-chan *Message, error) {
-	if k.consumer == nil {
-		err := k.createConsumer(k, k.consumer)
-		if err != nil {
-			return nil, err
-		}
-
-		// Pass message as a Message object to k.messages channel
-		go func() {
-			for {
-				msg := <-k.consumer.Messages()
-				message := &Message{}
-				if err := proto.Unmarshal(msg.Value, message); err != nil {
-					log.Fatalln("Could not parse message to transport.Message")
-					continue
-				}
-				k.messages <- message
-				k.consumer.MarkOffset(msg, "") // This should happen later...
-			}
-		}()
-	}
-	return k.messages, nil
+func (k *Kafka) Messages() <-chan *Message {
+	return k.messages
 }
 
 // Errors returns a channel to receive messages
-func (k *Kafka) Errors() (<-chan error, error) {
-	if k.consumer == nil {
-		err := k.createConsumer(k, k.consumer)
-		if err != nil {
-			return nil, err
-		}
-
-		// Pass errors to error channel
-		go func() {
-			for {
-				error := <-k.consumer.Errors()
-				k.errors <- error
-			}
-		}()
-	}
-	return k.errors, nil
+func (k *Kafka) Errors() <-chan error {
+	return k.errors
 }
 
 // Close cleans up both producer and consumer
 func (k *Kafka) Close() {
-	if k.producer != nil {
-		k.producer.Close()
-		close(k.messages)
-	}
-	if k.consumer != nil {
-		k.consumer.Close()
-		close(k.errors)
-	}
+	k.interact.Close()
+	close(k.errors)
+	close(k.messages)
 }
 
-func (k *Kafka) overrideCreationFuncs(consumerFunc createConsumerFunc, producerFunc createProducerFunc) {
-	k.createConsumer = consumerFunc
-	k.createProducer = producerFunc
-}
-
-func createProducer(k *Kafka, producer sarama.SyncProducer) error {
-	p, err := sarama.NewSyncProducer([]string{k.broker}, &k.configs.Producer)
-	if err != nil {
-		return err
+func consumeMessages(messagesOut chan *Message, messagesIn <-chan *sarama.ConsumerMessage) {
+	for {
+		msg := <-messagesIn
+		message := &Message{}
+		if err := proto.Unmarshal(msg.Value, message); err != nil {
+			log.Fatalln("Could not parse message to transport.Message")
+			continue
+		}
+		messagesOut <- message
+		// ki.MarkOffset(msg) // This should happen later... somehow we need to trigger acks from somewhere else
 	}
-	producer = p
-	return nil
 }
-
-func createConsumer(k *Kafka, consumer *cluster.Consumer) error {
-	c, err := cluster.NewConsumer([]string{k.broker}, k.consumerGroup, []string{k.topic}, &k.configs.Consumer)
-	if err != nil {
-		return err
+func consumeErrors(errorsOut chan error, errorsIn <-chan error) {
+	for {
+		error := <-errorsIn
+		errorsOut <- error
 	}
-	consumer = c
-	return nil
 }
