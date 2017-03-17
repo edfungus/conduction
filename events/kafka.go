@@ -1,91 +1,130 @@
 package events
 
 import (
-	"log"
-
 	"github.com/Shopify/sarama"
 	cluster "github.com/bsm/sarama-cluster"
-	"github.com/golang/protobuf/proto"
 )
 
-type Kafka struct {
-	interact KafkaInteractions
-	messages chan *Message
-	errors   chan error
+// Kafka is an interface to interact with Kafka
+type Kafka interface {
+	Send([]byte) error
+	Messages() <-chan *KafkaMessage
+	Errors() <-chan error
+	MarkOffset(topic string, partition int32, offset int64)
+	Close()
 }
 
-type KafkaConfigs struct {
+// KafkaMessage is a message from Kafka
+type KafkaMessage struct {
+	Data      []byte
+	Topic     string
+	Partition int32
+	Offset    int64
+}
+
+// KafkaSarama implements Kafka with the sarama library
+type KafkaSarama struct {
+	configs                      KafkaSaramaConfigs
+	broker, topic, consumerGroup string
+
+	producer sarama.SyncProducer
+	consumer *cluster.Consumer
+
+	messages chan *KafkaMessage
+}
+
+// KafkaSaramaConfigs holds the producer and consumer configs
+type KafkaSaramaConfigs struct {
 	Producer sarama.Config
 	Consumer cluster.Config
 }
 
-// NewKafka creates a new Kafka instance
-func NewKafka(broker string, topic string, consumerGroup string, configs KafkaConfigs) (*Kafka, error) {
-	ki, err := NewKafkaInteract(broker, topic, consumerGroup, configs)
+// NewKafkaSarama creates a new KafkaSarama
+func NewKafkaSarama(broker string, topic string, consumerGroup string, configs KafkaSaramaConfigs) (*KafkaSarama, error) {
+	ks := &KafkaSarama{
+		configs:       configs,
+		broker:        broker,
+		topic:         topic,
+		consumerGroup: consumerGroup,
+		messages:      make(chan *KafkaMessage),
+	}
+
+	producer, err := createProducer(ks)
+	if err != nil {
+		return nil, err
+	}
+	consumer, err := createConsumer(ks)
 	if err != nil {
 		return nil, err
 	}
 
-	messages := make(chan *Message)
-	errors := make(chan error)
+	ks.producer = producer
+	ks.consumer = consumer
 
-	k := Kafka{
-		interact: ki,
-		messages: messages,
-		errors:   errors,
-	}
-
-	go consumeMessages(messages, ki.Messages())
-	go consumeErrors(errors, ki.Errors())
-
-	return &k, nil
-}
-
-// Send sends a message to the designated topic
-func (k *Kafka) Send(msg *Message) error {
-	out, err := proto.Marshal(msg)
-	if err != nil {
-		return err
-	}
-	err = k.interact.Send(out)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// Messages returns a channel to receive messages
-func (k *Kafka) Messages() <-chan *Message {
-	return k.messages
-}
-
-// Errors returns a channel to receive messages
-func (k *Kafka) Errors() <-chan error {
-	return k.errors
-}
-
-// Close cleans up both producer and consumer
-func (k *Kafka) Close() {
-	k.interact.Close()
-	close(k.errors)
-	close(k.messages)
-}
-
-func consumeMessages(messagesOut chan *Message, messagesIn <-chan *sarama.ConsumerMessage) {
-	for {
-		msg := <-messagesIn
-		message := &Message{}
-		if err := proto.Unmarshal(msg.Value, message); err != nil {
-			log.Fatalln("Could not parse message to transport.Message")
-			continue
+	go func() {
+		for {
+			sm := <-ks.consumer.Messages()
+			km := saramaMessage2KafkaMessage(sm)
+			ks.messages <- km
 		}
-		messagesOut <- message
-		// ki.MarkOffset(msg) // This should happen later... somehow we need to trigger acks from somewhere else
-	}
+	}()
+
+	return ks, nil
 }
-func consumeErrors(errorsOut chan error, errorsIn <-chan error) {
-	for {
-		error := <-errorsIn
-		errorsOut <- error
+
+// Send sends message to Kafka
+func (ks *KafkaSarama) Send(msg []byte) error {
+	_, _, err := ks.producer.SendMessage(&sarama.ProducerMessage{
+		Topic: ks.topic,
+		Value: sarama.ByteEncoder(msg),
+	})
+	return err
+}
+
+// Messages gets messages from Kafka
+func (ks *KafkaSarama) Messages() <-chan *KafkaMessage {
+	return ks.messages
+}
+
+// Errors gets errors from Kafka
+func (ks *KafkaSarama) Errors() <-chan error {
+	return ks.consumer.Errors()
+}
+
+// MarkOffset ackowledges a message
+func (ks *KafkaSarama) MarkOffset(topic string, partition int32, offset int64) {
+	ks.consumer.MarkPartitionOffset(topic, partition, offset, "")
+}
+
+// Close ends a session with Kafka
+func (ks *KafkaSarama) Close() {
+	ks.consumer.Close()
+	ks.producer.Close()
+	close(ks.messages)
+}
+
+func saramaMessage2KafkaMessage(sm *sarama.ConsumerMessage) *KafkaMessage {
+	km := KafkaMessage{
+		Data:      sm.Value,
+		Topic:     sm.Topic,
+		Partition: sm.Partition,
+		Offset:    sm.Offset,
 	}
+	return &km
+}
+
+func createProducer(ks *KafkaSarama) (sarama.SyncProducer, error) {
+	p, err := sarama.NewSyncProducer([]string{ks.broker}, &ks.configs.Producer)
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func createConsumer(ks *KafkaSarama) (*cluster.Consumer, error) {
+	c, err := cluster.NewConsumer([]string{ks.broker}, ks.consumerGroup, []string{ks.topic}, &ks.configs.Consumer)
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
 }
