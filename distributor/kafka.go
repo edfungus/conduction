@@ -1,13 +1,15 @@
-package events
+package distributor
 
 import (
+	"time"
+
 	"github.com/Shopify/sarama"
 	cluster "github.com/bsm/sarama-cluster"
 )
 
 // Kafka is an interface to interact with Kafka
 type Kafka interface {
-	Send([]byte) error
+	Send([]byte)
 	Messages() <-chan *KafkaMessage
 	Errors() <-chan error
 	MarkOffset(topic string, partition int32, offset int64)
@@ -24,61 +26,84 @@ type KafkaMessage struct {
 
 // KafkaSarama implements Kafka with the sarama library
 type KafkaSarama struct {
-	configs                      KafkaSaramaConfigs
+	configs                      *KafkaSaramaConfigs
 	broker, topic, consumerGroup string
 
 	producer sarama.SyncProducer
 	consumer *cluster.Consumer
 
-	messages chan *KafkaMessage
+	messages     chan *KafkaMessage
+	stopMessages chan bool
 }
 
 // KafkaSaramaConfigs holds the producer and consumer configs
 type KafkaSaramaConfigs struct {
-	Producer sarama.Config
-	Consumer cluster.Config
+	Producer *sarama.Config
+	Consumer *cluster.Config
 }
 
 // NewKafkaSarama creates a new KafkaSarama
-func NewKafkaSarama(broker string, topic string, consumerGroup string, configs KafkaSaramaConfigs) (*KafkaSarama, error) {
+func NewKafkaSarama(broker string, topic string, consumerGroup string, configs *KafkaSaramaConfigs) (*KafkaSarama, error) {
 	ks := &KafkaSarama{
 		configs:       configs,
 		broker:        broker,
 		topic:         topic,
 		consumerGroup: consumerGroup,
 		messages:      make(chan *KafkaMessage),
+		stopMessages:  make(chan bool, 1),
 	}
 
-	producer, err := createProducer(ks)
-	if err != nil {
-		return nil, err
-	}
 	consumer, err := createConsumer(ks)
 	if err != nil {
 		return nil, err
 	}
+	producer, err := createProducer(ks)
+	if err != nil {
+		return nil, err
+	}
 
-	ks.producer = producer
 	ks.consumer = consumer
+	ks.producer = producer
 
 	go func() {
 		for {
-			sm := <-ks.consumer.Messages()
-			km := saramaMessage2KafkaMessage(sm)
-			ks.messages <- km
+			select {
+			case sm := <-ks.consumer.Messages():
+				ks.messages <- saramaMessage2KafkaMessage(sm)
+			case <-ks.stopMessages:
+				ks.consumer.Close()
+				return
+			}
 		}
 	}()
 
 	return ks, nil
 }
 
+// DefaultKafkaSaramaConfigs returns the default Sarama configuration
+func DefaultKafkaSaramaConfigs() *KafkaSaramaConfigs {
+	kc := &KafkaSaramaConfigs{
+		Producer: sarama.NewConfig(),
+		Consumer: cluster.NewConfig(),
+	}
+	kc.Consumer.Consumer.Return.Errors = true
+	kc.Consumer.Consumer.Offsets.Initial = sarama.OffsetOldest
+	kc.Producer.Producer.RequiredAcks = sarama.WaitForAll
+	kc.Producer.Producer.Retry.Max = 2
+	kc.Producer.Producer.Return.Successes = true
+	return kc
+}
+
 // Send sends message to Kafka
-func (ks *KafkaSarama) Send(msg []byte) error {
-	_, _, err := ks.producer.SendMessage(&sarama.ProducerMessage{
+func (ks *KafkaSarama) Send(msg []byte) {
+	// ks.producer.Input() <- &sarama.ProducerMessage{
+	// 	Topic: ks.topic,
+	// 	Value: sarama.ByteEncoder(msg),
+	// }
+	ks.producer.SendMessage(&sarama.ProducerMessage{
 		Topic: ks.topic,
 		Value: sarama.ByteEncoder(msg),
 	})
-	return err
 }
 
 // Messages gets messages from Kafka
@@ -98,9 +123,9 @@ func (ks *KafkaSarama) MarkOffset(topic string, partition int32, offset int64) {
 
 // Close ends a session with Kafka
 func (ks *KafkaSarama) Close() {
-	ks.consumer.Close()
+	ks.stopMessages <- true
+	time.Sleep(time.Second * 1)
 	ks.producer.Close()
-	close(ks.messages)
 }
 
 func saramaMessage2KafkaMessage(sm *sarama.ConsumerMessage) *KafkaMessage {
@@ -114,7 +139,7 @@ func saramaMessage2KafkaMessage(sm *sarama.ConsumerMessage) *KafkaMessage {
 }
 
 func createProducer(ks *KafkaSarama) (sarama.SyncProducer, error) {
-	p, err := sarama.NewSyncProducer([]string{ks.broker}, &ks.configs.Producer)
+	p, err := sarama.NewSyncProducer([]string{ks.broker}, ks.configs.Producer)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +147,7 @@ func createProducer(ks *KafkaSarama) (sarama.SyncProducer, error) {
 }
 
 func createConsumer(ks *KafkaSarama) (*cluster.Consumer, error) {
-	c, err := cluster.NewConsumer([]string{ks.broker}, ks.consumerGroup, []string{ks.topic}, &ks.configs.Consumer)
+	c, err := cluster.NewConsumer([]string{ks.broker}, ks.consumerGroup, []string{ks.topic}, ks.configs.Consumer)
 	if err != nil {
 		return nil, err
 	}

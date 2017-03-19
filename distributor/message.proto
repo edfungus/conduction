@@ -1,5 +1,5 @@
 syntax="proto3";
-package events;
+package distributor;
 
 message Message {
     string label = 1;

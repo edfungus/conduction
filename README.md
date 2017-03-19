@@ -1,11 +1,21 @@
 # conduction
-Event orchestrator 
 
+#### Description
+Event orchestrator
 
 #### Todo
-* Rename kafka.go to kafka-transport.og and kafka-interact.go to kafka?? reorg/rename things with comments 
-* Write Kafka test
 * Figure out how acks will work
 * Replace main.go with transport interface
 * Database and outbound interfaces
 * Add EventWorker.go
+
+#### Testing
+To run test, install ginkgo and in root of project, run:
+```bash
+ginkgo -r
+```
+
+#### Generating from proto file
+```bash
+./protoc -I=/home/edmund/Workspace/go/src/github.com/edfungus/conduction/distributor/ --go_out=/home/edmund/Workspace/go/src/github.com/edfungus/conduction/distributor /home/edmund/Workspace/go/src/github.com/edfungus/conduction/distributor/message.proto 
+```

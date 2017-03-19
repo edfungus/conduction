@@ -1,4 +1,4 @@
-package events
+package distributor
 
 //Distributor is used for internal or inter-broker communication
 type Distributor interface {
