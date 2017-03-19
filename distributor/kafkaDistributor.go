@@ -4,13 +4,14 @@ import (
 	"errors"
 	"time"
 
+	"github.com/edfungus/conduction/distributor/kafka"
 	"github.com/edfungus/conduction/model"
 	"github.com/golang/protobuf/proto"
 )
 
 // KafkaDistributor is the Kafka version of the distributor
 type KafkaDistributor struct {
-	kafka    Kafka
+	kafka    kafka.Client
 	messages chan *DistributorMessage
 	errors   chan error
 
@@ -19,7 +20,7 @@ type KafkaDistributor struct {
 }
 
 // NewKafkaDistributor creates a new Kafka instance
-func NewKafkaDistributor(kafka Kafka) *KafkaDistributor {
+func NewKafkaDistributor(kafka kafka.Client) *KafkaDistributor {
 	kd := KafkaDistributor{
 		kafka:        kafka,
 		messages:     make(chan *DistributorMessage),
@@ -56,7 +57,7 @@ func (kd *KafkaDistributor) Errors() <-chan error {
 
 // Acknowledge lets Kafka know that the message has been processed
 func (kd *KafkaDistributor) Acknowledge(msg *DistributorMessage) {
-	kd.kafka.MarkOffset(msg.topic, msg.partition, msg.offset)
+	kd.kafka.MarkOffset(msg.Topic, msg.Partition, msg.Offset)
 }
 
 // Close cleans up both producer and consumer
@@ -79,9 +80,9 @@ func (kd *KafkaDistributor) consumeMessages() {
 			}
 			dm := &DistributorMessage{
 				Message:   message,
-				topic:     km.Topic,
-				partition: km.Partition,
-				offset:    km.Offset,
+				Topic:     km.Topic,
+				Partition: km.Partition,
+				Offset:    km.Offset,
 			}
 			kd.messages <- dm
 		case <-kd.stopMessages:

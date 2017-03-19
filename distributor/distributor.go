@@ -14,7 +14,7 @@ type Distributor interface {
 // DistributorMessage is the message coming from a distributor
 type DistributorMessage struct {
 	Message   *model.Message
-	topic     string
-	partition int32
-	offset    int64
+	Topic     string
+	Partition int32
+	Offset    int64
 }

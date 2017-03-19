@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/edfungus/conduction/distributor"
+	"github.com/edfungus/conduction/distributor/kafka"
 	"github.com/edfungus/conduction/model"
 )
 
@@ -19,7 +20,7 @@ const (
 
 func main() {
 	fmt.Println("Hello Conduction!")
-	k, err := distributor.NewKafkaSarama(broker, topic, consumerGroup, distributor.DefaultKafkaSaramaConfigs())
+	k, err := kafka.NewKafkaSarama(broker, topic, consumerGroup, kafka.DefaultKafkaSaramaConfigs())
 	if err != nil {
 		log.Println(fmt.Sprintf("Could not connec to Kafka. Is Kafka running on %s? Error: %s", broker, err.Error()))
 	}

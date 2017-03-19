@@ -5,6 +5,7 @@ import (
 	"time"
 
 	. "github.com/edfungus/conduction/distributor"
+	"github.com/edfungus/conduction/distributor/kafka"
 	"github.com/edfungus/conduction/model"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -22,10 +23,10 @@ var _ = Describe("KafkaDistributor", func() {
 	})
 	Describe("When KafkaSarama is connected succesfully", func() {
 		var kd = &KafkaDistributor{}
-		var k = &KafkaSarama{}
+		var k = &kafka.KafkaSarama{}
 
 		BeforeEach(func() {
-			kd, k = MakeKafkaSaramaDistributor(broker, topic, consumerGroup, DefaultKafkaSaramaConfigs())
+			kd, k = MakeKafkaSaramaDistributor(broker, topic, consumerGroup, kafka.DefaultKafkaSaramaConfigs())
 			Expect(kd).ToNot(BeNil())
 		})
 		AfterEach(func() {
@@ -85,7 +86,7 @@ var _ = Describe("KafkaDistributor", func() {
 						Fail("Test took too long")
 					}
 
-					newkd, _ := MakeKafkaSaramaDistributor(broker, topic, consumerGroup, DefaultKafkaSaramaConfigs())
+					newkd, _ := MakeKafkaSaramaDistributor(broker, topic, consumerGroup, kafka.DefaultKafkaSaramaConfigs())
 
 					select {
 					case newMsg := <-newkd.Messages():
@@ -103,8 +104,8 @@ var _ = Describe("KafkaDistributor", func() {
 
 })
 
-func MakeKafkaSaramaDistributor(broker string, topic string, consumerGroup string, config *KafkaSaramaConfigs) (*KafkaDistributor, *KafkaSarama) {
-	k, err := NewKafkaSarama(broker, topic, consumerGroup, config)
+func MakeKafkaSaramaDistributor(broker string, topic string, consumerGroup string, config *kafka.KafkaSaramaConfigs) (*KafkaDistributor, *kafka.KafkaSarama) {
+	k, err := kafka.NewKafkaSarama(broker, topic, consumerGroup, config)
 	if err != nil {
 		Fail(fmt.Sprintf("Could not connec to Kafka. Is Kafka running on %s? Error: %s", broker, err.Error()))
 	}
@@ -113,7 +114,7 @@ func MakeKafkaSaramaDistributor(broker string, topic string, consumerGroup strin
 }
 
 func ClearTopic(broker string, topic string, consumerGroup string) {
-	kd, _ := MakeKafkaSaramaDistributor(broker, topic, consumerGroup, DefaultKafkaSaramaConfigs())
+	kd, _ := MakeKafkaSaramaDistributor(broker, topic, consumerGroup, kafka.DefaultKafkaSaramaConfigs())
 	defer kd.Close()
 
 	kd.Send(&model.Message{

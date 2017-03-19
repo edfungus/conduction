@@ -1,4 +1,4 @@
-package distributor
+package kafka
 
 import (
 	"time"
@@ -7,8 +7,8 @@ import (
 	cluster "github.com/bsm/sarama-cluster"
 )
 
-// Kafka is an interface to interact with Kafka
-type Kafka interface {
+// Client is an interface to interact with Kafka
+type Client interface {
 	Send([]byte)
 	Messages() <-chan *KafkaMessage
 	Errors() <-chan error
