@@ -3,8 +3,12 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"strconv"
 
 	"github.com/edfungus/conduction/distributor"
+	"github.com/edfungus/conduction/model"
 )
 
 const (
@@ -20,33 +24,39 @@ func main() {
 		log.Println(fmt.Sprintf("Could not connec to Kafka. Is Kafka running on %s? Error: %s", broker, err.Error()))
 	}
 	kd := distributor.NewKafkaDistributor(k)
+	defer kd.Close()
 
-	firstMessage := &distributor.Message{
-		Label:  "Hello!",
-		Number: 32,
+	firstMessage := &model.Message{
+		Endpoint: "hello",
+		Payload:  []byte(strconv.Itoa(32)),
 	}
 
 	kd.Send(firstMessage)
 
-	done := make(chan bool)
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt)
 	go func() {
 		for {
 			select {
 			case msg := <-kd.Messages():
 				kd.Acknowledge(msg)
-				fmt.Printf("Got label: %s and number: %d\n", msg.Message.GetLabel(), msg.Message.GetNumber())
-				newMessage := &distributor.Message{
-					Label:  msg.Message.GetLabel(),
-					Number: msg.Message.GetNumber() - 1,
+				number, err := strconv.Atoi(string(msg.Message.GetPayload()))
+				if err != nil {
+					return
 				}
-				if newMessage.GetNumber() > 0 {
+				fmt.Printf("Got label: %s and number: %d\n", msg.Message.GetEndpoint(), number)
+				if number-1 > 0 {
+					newMessage := &model.Message{
+						Endpoint: msg.Message.GetEndpoint(),
+						Payload:  []byte(strconv.Itoa(number - 1)),
+					}
 					kd.Send(newMessage)
 				}
 			case err := <-kd.Errors():
 				fmt.Println("Got an error: ", err.Error())
+			case <-signals:
+				return
 			}
 		}
 	}()
-
-	<-done
 }

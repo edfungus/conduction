@@ -17,5 +17,5 @@ ginkgo -r
 
 #### Generating from proto file
 ```bash
-./protoc -I=/home/edmund/Workspace/go/src/github.com/edfungus/conduction/distributor/ --go_out=/home/edmund/Workspace/go/src/github.com/edfungus/conduction/distributor /home/edmund/Workspace/go/src/github.com/edfungus/conduction/distributor/message.proto 
+./protoc -I=/home/edmund/Workspace/go/src/github.com/edfungus/conduction/models/ --go_out=/home/edmund/Workspace/go/src/github.com/edfungus/conduction/models /home/edmund/Workspace/go/src/github.com/edfungus/conduction/models/message.proto 
 ```

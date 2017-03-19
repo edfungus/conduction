@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/edfungus/conduction/model"
 	"github.com/golang/protobuf/proto"
 )
 
@@ -34,7 +35,7 @@ func NewKafkaDistributor(kafka Kafka) *KafkaDistributor {
 }
 
 // Send sends a message to the designated topic
-func (kd *KafkaDistributor) Send(msg *Message) error {
+func (kd *KafkaDistributor) Send(msg *model.Message) error {
 	out, err := proto.Marshal(msg)
 	if err != nil {
 		return err
@@ -69,7 +70,7 @@ func (kd *KafkaDistributor) consumeMessages() {
 	for {
 		select {
 		case km := <-kd.kafka.Messages():
-			message := &Message{}
+			message := &model.Message{}
 			if err := proto.Unmarshal(km.Data, message); err != nil {
 				// log.Println("Could not parse message to transport.Message, skipping...")
 				kd.errors <- errors.New("could not parse message to transport.Message, skipping message" + string(km.Data))

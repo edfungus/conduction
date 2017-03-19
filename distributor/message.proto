@@ -1,7 +1,0 @@
-syntax="proto3";
-package distributor;
-
-message Message {
-    string label = 1;
-    int32 number = 2;
-}

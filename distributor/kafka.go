@@ -96,10 +96,6 @@ func DefaultKafkaSaramaConfigs() *KafkaSaramaConfigs {
 
 // Send sends message to Kafka
 func (ks *KafkaSarama) Send(msg []byte) {
-	// ks.producer.Input() <- &sarama.ProducerMessage{
-	// 	Topic: ks.topic,
-	// 	Value: sarama.ByteEncoder(msg),
-	// }
 	ks.producer.SendMessage(&sarama.ProducerMessage{
 		Topic: ks.topic,
 		Value: sarama.ByteEncoder(msg),

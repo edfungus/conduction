@@ -5,6 +5,7 @@ import (
 	"time"
 
 	. "github.com/edfungus/conduction/distributor"
+	"github.com/edfungus/conduction/model"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -24,7 +25,7 @@ var _ = Describe("KafkaDistributor", func() {
 		var k = &KafkaSarama{}
 
 		BeforeEach(func() {
-			kd, k = MakeKafkaDistributor(broker, topic, consumerGroup, DefaultKafkaSaramaConfigs())
+			kd, k = MakeKafkaSaramaDistributor(broker, topic, consumerGroup, DefaultKafkaSaramaConfigs())
 			Expect(kd).ToNot(BeNil())
 		})
 		AfterEach(func() {
@@ -33,9 +34,8 @@ var _ = Describe("KafkaDistributor", func() {
 		Describe("Send & Receive", func() {
 			Context("With valid Message", func() {
 				It("Should send the message and receive it without error", func() {
-					msg := &Message{
-						Label:  "Test Send & Receive",
-						Number: 42,
+					msg := &model.Message{
+						Endpoint: "Test Send & Receive",
 					}
 					err := kd.Send(msg)
 					Expect(err).To(BeNil())
@@ -66,11 +66,12 @@ var _ = Describe("KafkaDistributor", func() {
 					}
 				})
 			})
+		})
+		Describe("Disconnect and Reconnect", func() {
 			Context("Without acknowledging", func() {
 				It("Should get the message again on reconnct", func() {
-					msg := &Message{
-						Label:  "Test Without acknowledging",
-						Number: 42,
+					msg := &model.Message{
+						Endpoint: "Test Without acknowledging",
 					}
 					err := kd.Send(msg)
 					Expect(err).To(BeNil())
@@ -84,7 +85,7 @@ var _ = Describe("KafkaDistributor", func() {
 						Fail("Test took too long")
 					}
 
-					newkd, _ := MakeKafkaDistributor(broker, topic, consumerGroup, DefaultKafkaSaramaConfigs())
+					newkd, _ := MakeKafkaSaramaDistributor(broker, topic, consumerGroup, DefaultKafkaSaramaConfigs())
 
 					select {
 					case newMsg := <-newkd.Messages():
@@ -99,9 +100,10 @@ var _ = Describe("KafkaDistributor", func() {
 			})
 		})
 	})
+
 })
 
-func MakeKafkaDistributor(broker string, topic string, consumerGroup string, config *KafkaSaramaConfigs) (*KafkaDistributor, *KafkaSarama) {
+func MakeKafkaSaramaDistributor(broker string, topic string, consumerGroup string, config *KafkaSaramaConfigs) (*KafkaDistributor, *KafkaSarama) {
 	k, err := NewKafkaSarama(broker, topic, consumerGroup, config)
 	if err != nil {
 		Fail(fmt.Sprintf("Could not connec to Kafka. Is Kafka running on %s? Error: %s", broker, err.Error()))
@@ -111,12 +113,11 @@ func MakeKafkaDistributor(broker string, topic string, consumerGroup string, con
 }
 
 func ClearTopic(broker string, topic string, consumerGroup string) {
-	kd, _ := MakeKafkaDistributor(broker, topic, consumerGroup, DefaultKafkaSaramaConfigs())
+	kd, _ := MakeKafkaSaramaDistributor(broker, topic, consumerGroup, DefaultKafkaSaramaConfigs())
 	defer kd.Close()
 
-	kd.Send(&Message{
-		Label:  "Clearing messages",
-		Number: 2,
+	kd.Send(&model.Message{
+		Endpoint: "Clearing messages",
 	})
 
 	stop := make(chan bool, 1)
