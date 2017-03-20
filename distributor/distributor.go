@@ -12,6 +12,7 @@ type Distributor interface {
 }
 
 // DistributorMessage is the message coming from a distributor
+// TODO: Rename to ReceivedMessage
 type DistributorMessage struct {
 	Message   *model.Message
 	Topic     string

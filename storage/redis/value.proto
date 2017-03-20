@@ -1,0 +1,7 @@
+syntax="proto3";
+package redis;
+
+message Value {
+    string method = 1;
+    string path = 2;
+}
