@@ -94,14 +94,22 @@ var _ = Describe("KafkaDistributor", func() {
 						Expect(newMsg.Message).Should(Equal(msg))
 					case err := <-newkd.Errors():
 						Fail(err.Error())
-					case <-time.After(time.Second * 10):
+					case <-time.After(time.Second * 30):
 						Fail("Test took too long")
 					}
 				})
 			})
 		})
 	})
-
+	Describe("When KafkaSarama broker is not available", func() {
+		Context("Trying to make new KafkaSarama", func() {
+			It("Should error and not make client", func() {
+				k, err := kafka.NewKafkaSarama("localhost:9999", topic, consumerGroup, kafka.DefaultKafkaSaramaConfigs())
+				Expect(k).To(BeNil())
+				Expect(err).ToNot(BeNil())
+			})
+		})
+	})
 })
 
 func MakeKafkaSaramaDistributor(broker string, topic string, consumerGroup string, config *kafka.KafkaSaramaConfigs) (*KafkaDistributor, *kafka.KafkaSarama) {

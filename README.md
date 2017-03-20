@@ -4,9 +4,9 @@
 Event orchestrator
 
 #### Todo
-* Kafka cannot connect tests?
-* Test RedisStorage
 * Replace main.go with transport interface
+* Make a MQTT connector
+* Make a REST connector
 * Add EventWorker.go
 * Refactor to combine kafka and kafkaDdistributor...
 
