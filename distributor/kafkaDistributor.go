@@ -12,7 +12,7 @@ import (
 // KafkaDistributor is the Kafka version of the distributor
 type KafkaDistributor struct {
 	kafka    kafka.Client
-	messages chan *DistributorMessage
+	messages chan *ReceivedMessage
 	errors   chan error
 
 	stopMessages chan bool
@@ -23,7 +23,7 @@ type KafkaDistributor struct {
 func NewKafkaDistributor(kafka kafka.Client) *KafkaDistributor {
 	kd := KafkaDistributor{
 		kafka:        kafka,
-		messages:     make(chan *DistributorMessage),
+		messages:     make(chan *ReceivedMessage),
 		errors:       make(chan error),
 		stopMessages: make(chan bool, 1),
 		stopErrors:   make(chan bool, 1),
@@ -46,7 +46,7 @@ func (kd *KafkaDistributor) Send(msg *model.Message) error {
 }
 
 // Messages returns a channel to receive messages
-func (kd *KafkaDistributor) Messages() <-chan *DistributorMessage {
+func (kd *KafkaDistributor) Messages() <-chan *ReceivedMessage {
 	return kd.messages
 }
 
@@ -56,7 +56,7 @@ func (kd *KafkaDistributor) Errors() <-chan error {
 }
 
 // Acknowledge lets Kafka know that the message has been processed
-func (kd *KafkaDistributor) Acknowledge(msg *DistributorMessage) {
+func (kd *KafkaDistributor) Acknowledge(msg *ReceivedMessage) {
 	kd.kafka.MarkOffset(msg.Topic, msg.Partition, msg.Offset)
 }
 
@@ -78,7 +78,7 @@ func (kd *KafkaDistributor) consumeMessages() {
 				kd.kafka.MarkOffset(km.Topic, km.Partition, km.Offset)
 				continue
 			}
-			dm := &DistributorMessage{
+			dm := &ReceivedMessage{
 				Message:   message,
 				Topic:     km.Topic,
 				Partition: km.Partition,

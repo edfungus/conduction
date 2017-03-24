@@ -1,11 +1,11 @@
 # conduction
 
 #### Description
-Event orchestrator
+Enable MQTT/Rest endpoints and topics to interact with other MQTT/Rest endpoints and topics. A configurable interface(?)
 
 #### Todo
-* Replace main.go with transport interface
-* Make a MQTT connector
+* Make a MQTT connector (pub/sub)
+* Make first mqtt e2e
 * Make a REST connector
 * Add EventWorker.go
 * Refactor to combine kafka and kafkaDdistributor...
@@ -18,5 +18,5 @@ ginkgo -r
 
 #### Generating from proto file
 ```bash
-./protoc -I=/home/edmund/Workspace/go/src/github.com/edfungus/conduction/storage/redis --go_out=/home/edmund/Workspace/go/src/github.com/edfungus/conduction/storage/redis/ /home/edmund/Workspace/go/src/github.com/edfungus/conduction/storage/redis/value.proto 
+./protoc -I=/home/edmund/Workspace/go/src/github.com/edfungus/conduction/model --go_out=/home/edmund/Workspace/go/src/github.com/edfungus/conduction/model/ /home/edmund/Workspace/go/src/github.com/edfungus/conduction/model/message.proto 
 ```
