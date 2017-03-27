@@ -1,7 +1,0 @@
-syntax="proto3";
-package model;
-
-message Message {
-    string endpoint = 1;
-    bytes payload = 2;
-}
