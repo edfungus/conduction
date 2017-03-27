@@ -1,0 +1,24 @@
+syntax="proto3";
+package pb;
+
+// Message is passed between connectors and Conduction 
+// A Message should not have origin AND destination. Origin will be in Messages from connectors to Conduction and destination will be from Conduction to connectors
+message Message {
+    Path origin = 1;            // The origin of the Message. Conduction will use this to route to other destinations
+    Path return = 2;            // If applicable, final Message's payload will be sent here. Final Message is decided when origin has no next destination
+    Path destination = 3;       // Set by Conduction to tell connectors how/where to send the payload
+    bytes payload = 4;
+}
+
+message Path {
+    string path = 1;            // Describes what path/topic/queue 
+    ConnectorType type = 2;     // Describes what type of connector
+    bytes metadata = 3;         // Extra storage for connector specific metadata (some other protobuf)
+
+    enum ConnectorType {
+        HTTP = 0;
+        MQTT = 1;
+        KAFKA = 2;
+        LAMBDA = 3;
+    }
+}
