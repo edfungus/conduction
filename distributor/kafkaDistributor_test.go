@@ -19,7 +19,7 @@ const (
 
 var _ = Describe("KafkaDistributor", func() {
 	BeforeSuite(func() {
-		ClearTopic(broker, topic, consumerGroup)
+		ClearKafkaTopic(broker, topic, consumerGroup)
 	})
 	Describe("When KafkaSarama is connected succesfully", func() {
 		var kd = &KafkaDistributor{}
@@ -121,7 +121,7 @@ func MakeKafkaSaramaDistributor(broker string, topic string, consumerGroup strin
 	return kd, k
 }
 
-func ClearTopic(broker string, topic string, consumerGroup string) {
+func ClearKafkaTopic(broker string, topic string, consumerGroup string) {
 	kd, _ := MakeKafkaSaramaDistributor(broker, topic, consumerGroup, kafka.DefaultKafkaSaramaConfigs())
 	defer kd.Close()
 
