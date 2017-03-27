@@ -12,13 +12,14 @@ import (
 )
 
 var _ = Describe("MqttConnector", func() {
-	var (
-		mc      *MqttConnector
-		message []byte = []byte("test message")
-	)
 	const (
 		topic    string = "testTopic"
 		clientID string = "MqttTestClient2"
+	)
+	var (
+		mc      *MqttConnector
+		message []byte = []byte("test message")
+		path           = Path{PathName: topic}
 	)
 	BeforeSuite(func() {
 		ClearMqttTopic(clientID, topic)
@@ -43,7 +44,7 @@ var _ = Describe("MqttConnector", func() {
 	Describe("Given a message comes to a topic", func() {
 		Context("When the topic is being subscribed to", func() {
 			It("Should push a Request object to its given Requests() channel", func() {
-				err := mc.Subscribe(topic)
+				err := mc.AddPath(path)
 				Expect(err).To(BeNil())
 				err = mc.Respond(topic, message)
 				Expect(err).To(BeNil())
@@ -67,7 +68,7 @@ var _ = Describe("MqttConnector", func() {
 		})
 		Context("When the topic has been unsubscribed to", func() {
 			It("Should not receive a message", func() {
-				err := mc.Unsubscribe(topic)
+				err := mc.RemovePath(path)
 				Expect(err).To(BeNil())
 				err = mc.Respond(topic, message)
 				Expect(err).To(BeNil())
@@ -89,9 +90,9 @@ func ClearMqttTopic(clientID string, topic string) {
 	Expect(err).To(BeNil())
 	defer mc.Close()
 
-	mc.Subscribe(topic)
+	mc.AddPath(Path{PathName: topic})
 	mc.Respond(topic, []byte("some message"))
-	defer mc.Unsubscribe(topic)
+	defer mc.RemovePath(Path{PathName: topic})
 
 	stop := make(chan bool, 1)
 	firstMessage := true

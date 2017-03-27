@@ -69,16 +69,16 @@ func (mc *MqttConnector) Close() error {
 }
 
 // Subscribe listens to a queue and pushes it to the requetss channel
-func (mc *MqttConnector) Subscribe(topic string) error {
-	if token := mc.client.Subscribe(topic, byte(1), mc.subscribeHandler); token.Wait() && token.Error() != nil {
+func (mc *MqttConnector) AddPath(path Path) error {
+	if token := mc.client.Subscribe(path.PathName, byte(1), mc.subscribeHandler); token.Wait() && token.Error() != nil {
 		return token.Error()
 	}
 	return nil
 }
 
 // Unsubscribe stops listening to a topic
-func (mc *MqttConnector) Unsubscribe(topic string) error {
-	if token := mc.client.Unsubscribe(topic); token.Wait() && token.Error() != nil {
+func (mc *MqttConnector) RemovePath(path Path) error {
+	if token := mc.client.Unsubscribe(path.PathName); token.Wait() && token.Error() != nil {
 		return token.Error()
 	}
 	return nil

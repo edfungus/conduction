@@ -1,46 +1,78 @@
 package main
 
 import (
-	"os"
-	"os/signal"
+	"fmt"
 
 	"github.com/edfungus/conduction/connector"
-	"github.com/sirupsen/logrus"
 )
 
 type Conduction struct {
+	connections       map[string]connector.Connector
+	incomeRequests    chan *connector.Request
+	mqttRelationships map[string][]string // used in place of database to store routing relationships for now
 }
-
-var Logger = logrus.New()
 
 const (
 	mqttBroker string = "tcp://localhost:1883/"
 )
 
-// NewConduction just making poc then expanding
-func NewConduction() {
+// NewConduction returns conduction
+func NewConduction() *Conduction {
+	return &Conduction{
+		connections:       make(map[string]connector.Connector),
+		incomeRequests:    make(chan *connector.Request),
+		mqttRelationships: make(map[string][]string),
+	}
+}
+
+// Wire takes content from one connection endpoint and sends the contents to another connection endpoint
+func (c *Conduction) Wire(inConn string, inPath connector.Path, outConn string, outPath connector.Path) error {
+	// Check if connection exists
+	if _, ok := c.connections[inConn]; !ok {
+		return fmt.Errorf("Input connection %s does not exist", inConn)
+	}
+	if _, ok := c.connections[outConn]; !ok {
+		return fmt.Errorf("Output connection %s does not exist", outConn)
+	}
+
+	// If not listening to inPath, then listen (right now we always adds)
+	err := c.connections[inConn].AddPath(inPath)
+	if err != nil {
+		return err
+	}
+
+	// Stores this relationship somewhere...
+	if val, ok := c.mqttRelationships[inPath.PathName]; ok {
+		c.mqttRelationships[inPath.PathName] = append(val, outPath.PathName)
+	} else {
+		// Not an existing input, so create it
+		c.mqttRelationships[inPath.PathName] = []string{outPath.PathName}
+	}
+
+	return nil
+}
+
+// Close stops conduction and cleans up connections
+func (c *Conduction) Close() {
+	for _, v := range c.connections {
+		v.Close()
+	}
+}
+
+// AddMqttConnection starts a new MQTT connection which can be later referenced by a name
+func (c *Conduction) AddMqttConnection(name string) (string, error) {
 	mqttConfig := connector.MqttConnectorConfig{
 		ClientID: "conduction",
 	}
 	mqttClient, err := connector.NewMqttConnector(mqttBroker, mqttConfig)
 	if err != nil {
-		Logger.Error(err)
+		return "", err
 	}
 
-	mqttClient.Subscribe("inTopic")
+	go func() {
+		msg := <-mqttClient.Requests()
+		c.incomeRequests <- msg
+	}()
 
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, os.Interrupt)
-	for {
-		select {
-		case msg := <-mqttClient.Requests():
-			mqttClient.Respond("outTopic", msg.Payload)
-		case <-signals:
-			return
-		}
-	}
-}
-
-func setupLogger() {
-	Logger.Level = logrus.WarnLevel
+	return
 }
