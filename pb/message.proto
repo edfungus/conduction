@@ -11,9 +11,9 @@ message Message {
 }
 
 message Path {
-    string path = 1;            // Describes what path/topic/queue 
-    ConnectorType type = 2;     // Describes what type of connector
-    bytes metadata = 3;         // Extra storage for connector specific metadata (some other protobuf)
+    string path = 1;                    // Describes what path/topic/queue 
+    ConnectorType type = 2;             // Describes what type of connector
+    map<string, string> metadata = 4;   // Extra storage for connector specific metadata but should not be critical in identifying uniqueness of path
 
     enum ConnectorType {
         HTTP = 0;
@@ -21,4 +21,11 @@ message Path {
         KAFKA = 2;
         LAMBDA = 3;
     }
+}
+
+message Flow {
+    string name = 1;
+    string description = 2
+    Path path = 3;
+    repeated Flow dependentFlows = 4; 
 }
