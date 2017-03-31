@@ -186,7 +186,7 @@ This one is very similar to jst mqtt to mqtt
     ```
 10. conduction --> rest controller
     Because the next Flows is `wait`=true, we don't actually execute. We usually consolidate all the payloads and send to next Flow which is REST but since one is `wait`=true, we onl take the payload of the `wait` Flow. Note, if the parent was a Lambda, we would send the consolidated JSON to the lambda and then send the output of the Lambda to REST. 
-    `` 
+    ```
     Message {
         Path destination = {type=0, metadata.controllerID = 1}
         bytes payload = "DONE"                        
