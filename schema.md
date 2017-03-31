@@ -27,5 +27,20 @@ Incoming requests are mapped to a path uuid which then can be mapped to a one or
 | --- |
 | path* (uuid) |
 | path (string) |
-| type (string?) |
+| type (string) |
 
+
+Temporary incoming paths. This is for multi-step Flows or wait Flows
+| incomingTempPaths |
+| --- |
+| path (string) |
+| type (string) |
+| identity (string) |
+| tempFlow (uuid) |
+| payload ([]byte) | // This stores the payload of each dependent as they come in. This will also 
+
+
+| tempFlows |
+| --- |
+| tempFlow (uuid) |
+| flow ([]byte) |
