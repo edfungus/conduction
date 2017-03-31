@@ -13,6 +13,7 @@ message Message {
 message Path {
     string path = 1;                    // Describes what path/topic/queue 
     ConnectorType type = 2;             // Describes what type of connector
+    string identity = 3;
     map<string, string> metadata = 4;   // Extra storage for connector specific metadata but should not be critical in identifying uniqueness of path
 
     enum ConnectorType {
@@ -28,4 +29,5 @@ message Flow {
     string description = 2
     Path path = 3;
     repeated Flow dependentFlows = 4; 
+    boolean wait = 5;
 }
