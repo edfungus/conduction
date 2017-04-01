@@ -16,7 +16,7 @@ This is for me to get my thoughts together to make a better architecture. There 
     MQTT connector gets message and makes this:
     ```
     Message {
-        Path origin = {path=in, type=1}
+        Path origin = {route=in, type=1}
         bytes payload
     }
     ```
@@ -26,7 +26,7 @@ This is for me to get my thoughts together to make a better architecture. There 
     ```
     []Flows = [
         Flow {
-            Path path = {path=out, type=1}
+            Path path = {route=out, type=1}
         }
     ]
     ```
@@ -35,7 +35,7 @@ This is for me to get my thoughts together to make a better architecture. There 
     Using the Path given, create a new Message to pass back to the mqtt connector
      ```
     Message {
-        Path destination = {path=out, type=1}
+        Path destination = {route=out, type=1}
         bytes payload
     }
     ```
@@ -49,7 +49,7 @@ This is for me to get my thoughts together to make a better architecture. There 
     Coverts call to Message. REST will always have a return Path to identify the controller:
     ```
     Message {
-        Path origin = {path=GET_/home, type=0}
+        Path origin = {route=GET_/home, type=0}
         Path return = {type=0, metadata.controllerID = 1}
     }
     ```
@@ -59,7 +59,7 @@ This is for me to get my thoughts together to make a better architecture. There 
     ```
     []Flows = [
         Flow {
-            Path path = {path=GET_/catpics, type=0}
+            Path path = {route=GET_/catpics, type=0}
         }
     ]
     ```
@@ -69,7 +69,7 @@ This is for me to get my thoughts together to make a better architecture. There 
     Making the call to get a cat picture. Notice return get passed to the connector because returns are handled by the connector (perhaps not...might just insert into `incomingTempPaths` table):
     ```
     Message {
-        Path destination = {path=GET_/catpics, type=1}
+        Path destination = {route=GET_/catpics, type=1}
         Path return = {type=0, metadata.controllerID = 1}
     }
     ```
@@ -78,7 +78,7 @@ This is for me to get my thoughts together to make a better architecture. There 
     Afer getting the cat piture, send back to conduction. If there was a return, the connector will place it in destination when completely its task:
     ```
     Message {
-        Path origin = {path=GET_/catpics, type=1}
+        Path origin = {route=GET_/catpics, type=1}
         Path destination = {type=0, metadata.controllerID = 1}
         bytes payload = `catpic`
     }
@@ -126,7 +126,7 @@ This one is very similar to jst mqtt to mqtt
     Creates:
     ```
     Message {
-        Path origin = {path=GET_/home, type=0}
+        Path origin = {route=GET_/home, type=0}
         Path return = {type=0, metadata.controllerID = 1}
         bytes payload = 255        
     }
@@ -135,9 +135,9 @@ This one is very similar to jst mqtt to mqtt
     ```
     []Flows = [
         Flow {
-            Path path = {path=lightOn, type=1, 
+            Path path = {route=lightOn, type=1, 
                 dependentFlows=Flow {
-                    Path path = {path=turnOnLight, type=1}
+                    Path path = {route=turnOnLight, type=1}
                 }, wait=true
             }
         },
@@ -156,7 +156,7 @@ This one is very similar to jst mqtt to mqtt
     Note that identity is set.. but MQTT doesn't support identity...so what ever next message matches the expect return will continue to Flow
     ```
     Message {
-        Path destination = {path=turnOnLight, type=0, identity=uuid}
+        Path destination = {route=turnOnLight, type=0, identity=uuid}
         bytes payload = 255                
     }
     ```
@@ -167,7 +167,7 @@ This one is very similar to jst mqtt to mqtt
 8. mqtt connector --> conduction 
     ```
     Message {
-        Path origin = {path=lightOn, type=0}
+        Path origin = {route=lightOn, type=0}
         bytes payload = "DONE"                
     }
     ```
@@ -177,7 +177,7 @@ This one is very similar to jst mqtt to mqtt
     incomingPaths --> []Flow = nil
     incomingTempPaths --> tempFlows --> []Flow = [
         Flow {
-            Path path = {path=turnOnLight, type=1, wait=true}
+            Path path = {route=turnOnLight, type=1, wait=true}
         },
         Flow {
             Path path = {type=0, metadata.controllerID = 1}
