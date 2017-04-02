@@ -8,6 +8,7 @@ message Message {
     Path return = 2;            // If applicable, final Message's payload will be sent here. Final Message is decided when origin has no next destination
     Path destination = 3;       // Set by Conduction to tell connectors how/where to send the payload
     bytes payload = 4;
+    map<string, string> metadata = 5;       
 }
 
 message Path {
@@ -26,8 +27,8 @@ message Path {
 
 message Flow {
     string name = 1;
-    string description = 2
+    string description = 2;
     Path path = 3;
     repeated Flow dependentFlows = 4; 
-    boolean wait = 5;
+    bool wait = 5;
 }

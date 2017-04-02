@@ -5,6 +5,10 @@ Event based Kafka router; second times the charm!
 
 [Last commit of previous attempt](https://github.com/edfungus/conduction/tree/892cf01f4c0c2b669f69b1d6aa1077ce7e7bf66f)
 
+```
+./protoc -I=/home/edmund/Workspace/go/src/github.com/edfungus/conduction/pb --go_out=/home/edmund/Workspace/go/src/github.com/edfungus/conduction/pb/ /home/edmund/Workspace/go/src/github.com/edfungus/conduction/pb/message.proto 
+```
+
 ### Examples ... aka thinking out loud
 This is for me to get my thoughts together to make a better architecture. There are a fair number of features and requirements I want to support and it is more complicated than I anticipated.
 
