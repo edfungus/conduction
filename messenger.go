@@ -2,6 +2,9 @@ package main
 
 import (
 	"fmt"
+	"time"
+
+	"log"
 
 	"github.com/Shopify/sarama"
 	cluster "github.com/bsm/sarama-cluster"
@@ -18,7 +21,7 @@ import (
 // Messenger orchestrates communication between conduction modules
 type Messenger interface {
 	Send(topic string, msg pb.Message) error
-	Receive() (<-chan pb.Message, error)
+	Receive() <-chan pb.Message
 	Acknowledge(pb.Message) error
 	Close() error
 }
@@ -29,12 +32,18 @@ type KafkaMessenger struct {
 	consumer *cluster.Consumer
 
 	messages chan *pb.Message
+	stop     chan bool
 }
 
 type KafkaMessengerConfig struct {
 	ConsumerGroup string
 	InputTopic    string
 }
+
+const (
+	MESSAGE_PARTITION string = "messagePartition"
+	MESSAGE_OFFSET    string = "messageOffset"
+)
 
 // NewKafkaMessenger returns a new KafkaMessenger
 func NewKafkaMessenger(broker string, config *KafkaMessengerConfig) (*KafkaMessenger, error) {
@@ -48,6 +57,7 @@ func NewKafkaMessenger(broker string, config *KafkaMessengerConfig) (*KafkaMesse
 	}
 
 	kafkaConsumerConfig := cluster.NewConfig()
+	kafkaConsumerConfig.Consumer.Return.Errors = true
 	kafkaConsumerConfig.Consumer.Offsets.Initial = sarama.OffsetOldest
 	kafkaConsumer, err := cluster.NewConsumer([]string{broker}, config.ConsumerGroup, []string{config.InputTopic}, kafkaConsumerConfig)
 	if err != nil {
@@ -55,47 +65,68 @@ func NewKafkaMessenger(broker string, config *KafkaMessengerConfig) (*KafkaMesse
 	}
 
 	messages := make(chan *pb.Message)
-
-	go toMessage(kafkaConsumer, messages)
-
-	return &KafkaMessenger{
+	stop := make(chan bool)
+	km := &KafkaMessenger{
 		producer: kafkaProducer,
 		consumer: kafkaConsumer,
 		messages: messages,
-	}, nil
+		stop:     stop,
+	}
+
+	go toMessage(km.consumer, km.messages, km.stop)
+
+	return km, nil
 }
 
-func (km *KafkaMessenger) Send(topic string, msg pb.Message) error {
-
+func (km *KafkaMessenger) Send(topic string, msg *pb.Message) error {
+	return nil
 }
 
-func (km *KafkaMessenger) Receive() (<-chan pb.Message, error) {
-
+func (km *KafkaMessenger) Receive() <-chan pb.Message {
+	return nil
 }
 
 func (km *KafkaMessenger) Acknowledge(pb.Message) error {
-
+	return nil
 }
 
 // Close stops the Kafka Messenger from sending and receiving messages
 func (km *KafkaMessenger) Close() error {
-	perr := km.producer.Close()
-	cerr := km.consumer.Close()
-	if perr != nil || cerr != nil {
-		return fmt.Errorf("Error closing Kafka Messenger. Kafka Producer Error: %v Kafka Consumer Error: %v", perr, cerr)
+	km.stop <- true
+	time.Sleep(time.Second * 1)
+	err := km.producer.Close()
+	if err != nil {
+		return fmt.Errorf("Error closing Kafka Producer. %v", err)
 	}
 	return nil
 }
 
-func toMessage(consumer *cluster.Consumer, messages chan *pb.Message) {
+func toMessage(consumer *cluster.Consumer, messages chan *pb.Message, stop chan bool) {
 	for {
-		msg := <-consumer.Messages()
-		msgObj := &pb.Message{}
-		err := proto.Unmarshal(msg.Value, msgObj)
-		if err != nil {
-			Logger.Error("Could not unmarshal message from Kafka. Skipping message. Error:", err)
-			consumer.MarkOffset(msg, "")
+		select {
+		case msg := <-consumer.Messages():
+			log.Println("MESSAGE!")
+			log.Println(msg.Topic)
+			msgObj := &pb.Message{}
+			log.Println(msg.Value)
+			err := proto.Unmarshal(msg.Value, msgObj)
+			if err != nil {
+				Logger.Error("Could not unmarshal message from Kafka. Skipping message. Error:", err)
+				consumer.MarkOffset(msg, "")
+			}
+			messages <- msgObj
+		case err := <-consumer.Errors():
+			Logger.Error(err.Error())
+		case <-stop:
+			err := consumer.Close()
+			if err != nil {
+				Logger.Errorf("Error closing Kafka Consumer. %v", err)
+			}
+			return
 		}
-		messages <- msgObj
 	}
+}
+
+func (km *KafkaMessenger) GetProducer() sarama.SyncProducer {
+	return km.producer
 }
