@@ -127,6 +127,7 @@ var _ = Describe("Conduction", func() {
 						Expect(msg.Payload).To(Equal(message.Payload))
 						Expect(msg.Metadata).To(HaveKey(MESSAGE_PARTITION))
 						Expect(msg.Metadata).To(HaveKey(MESSAGE_OFFSET))
+						Expect(msg.Metadata).To(HaveKey(MESSAGE_TOPIC))
 
 						err = messenger.Acknowledge(msg)
 						Expect(err).To(BeNil())

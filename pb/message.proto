@@ -8,14 +8,14 @@ message Message {
     Path return = 2;            // If applicable, final Message's payload will be sent here. Final Message is decided when origin has no next destination
     Path destination = 3;       // Set by Conduction to tell connectors how/where to send the payload
     bytes payload = 4;
-    map<string, string> metadata = 5;       
+    map<string, bytes> metadata = 5;       
 }
 
 message Path {
     string route = 1;                    // Describes what path/topic/queue 
     ConnectorType type = 2;             // Describes what type of connector
     string identity = 3;                // (Transient)
-    map<string, string> metadata = 4;   // (Transient) Extra storage for connector specific metadata but should not be critical in identifying uniqueness of path
+    map<string, bytes> metadata = 4;   // (Transient) Extra storage for connector specific metadata but should not be critical in identifying uniqueness of path
 
     enum ConnectorType {
         HTTP = 0;
