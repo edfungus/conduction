@@ -14,12 +14,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-const (
-	kafkaBroker        string = "localhost:9092"
-	kafkaConsumerGroup string = "conduction-test"
-	kafkaInputTopic    string = "conductionIn-test"
-)
-
 var _ = Describe("Conduction", func() {
 	Describe("Messenger", func() {
 		var (

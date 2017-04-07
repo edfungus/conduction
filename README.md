@@ -1,4 +1,4 @@
-# conduction
+# Conduction [![Build Status](https://travis-ci.org/edfungus/conduction.svg?branch=master)](https://travis-ci.org/edfungus/conduction)
 
 ### Description
 Event based Kafka router; second times the charm!

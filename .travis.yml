@@ -1,0 +1,20 @@
+language: go
+
+go:
+  - tip
+
+env:
+ - KAFKA_URL=localhost:9092
+
+before_install:
+  - wget http://apache.claz.org/kafka/0.10.2.0/kafka_2.11-0.10.2.0.tgz -O kafka.tgz
+  - mkdir -p kafka && tar xzf kafka.tgz -C kafka --strip-components 1
+  - kafka/bin/zookeeper-server-start.sh -daemon kafka/config/zookeeper.properties
+  - sleep 3
+  - kafka/bin/kafka-server-start.sh -daemon kafka/config/server.properties
+  - sleep 5
+  - go get -v github.com/onsi/ginkgo/ginkgo
+
+script:
+  - go build ./...
+  - ginkgo -r -tags all

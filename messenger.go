@@ -13,12 +13,6 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-// const (
-// 	kafkaBroker          string = "localhost:9092"
-// 	kafkaConsumerGroup   string = "conduction"
-// 	conductionInputTopic string = "conductionIn"
-// )
-
 // Messenger orchestrates communication between conduction modules
 type Messenger interface {
 	Send(topic string, msg pb.Message) error
