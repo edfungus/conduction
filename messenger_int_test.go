@@ -44,7 +44,7 @@ var _ = Describe("Conduction", func() {
 					Expect(err).To(BeNil())
 					Expect(messenger).ToNot(BeNil())
 					err = messenger.Close()
-					Expect(err).ToNot(BeNil())
+					Expect(err).To(BeNil())
 				})
 			})
 		})
@@ -56,7 +56,8 @@ var _ = Describe("Conduction", func() {
 				}
 			)
 			BeforeEach(func() {
-				messenger, err := NewKafkaMessenger(kafkaBroker, config)
+				var err error
+				messenger, err = NewKafkaMessenger(kafkaBroker, config)
 				Expect(err).To(BeNil())
 				Expect(messenger).ToNot(BeNil())
 			})
@@ -75,6 +76,7 @@ var _ = Describe("Conduction", func() {
 						Expect(msg.Payload).To(Equal(message.Payload))
 						Expect(msg.Metadata).To(HaveKey(MESSAGE_PARTITION))
 						Expect(msg.Metadata).To(HaveKey(MESSAGE_OFFSET))
+						Expect(msg.Metadata).To(HaveKey(MESSAGE_TOPIC))
 
 						err = messenger.Acknowledge(msg)
 						Expect(err).To(BeNil())
@@ -109,15 +111,14 @@ var _ = Describe("Conduction", func() {
 						Expect(msg.Payload).To(Equal(message.Payload))
 						Expect(msg.Metadata).To(HaveKey(MESSAGE_PARTITION))
 						Expect(msg.Metadata).To(HaveKey(MESSAGE_OFFSET))
-
+						Expect(msg.Metadata).To(HaveKey(MESSAGE_TOPIC))
 					case <-time.After(time.Second * 10):
 						Fail("Message took too long to send and receive")
 					}
-
 					err = messenger.Close()
 					Expect(err).To(BeNil())
 
-					messenger, err := NewKafkaMessenger(kafkaBroker, config)
+					messenger, err = NewKafkaMessenger(kafkaBroker, config)
 					Expect(err).To(BeNil())
 					Expect(messenger).ToNot(BeNil())
 
@@ -158,6 +159,7 @@ func ClearKafkaTopic(broker string, topic string, consumerGroup string) {
 
 	stop := make(chan bool, 1)
 	firstMessage := true
+	count := 0
 	for {
 		select {
 		case msg := <-messenger.Receive():
@@ -169,7 +171,9 @@ func ClearKafkaTopic(broker string, topic string, consumerGroup string) {
 				}()
 			}
 			messenger.Acknowledge(msg)
+			count++
 		case <-stop:
+			fmt.Printf("Cleared %d message(s)\n", count)
 			return
 		case <-time.After(time.Second * 30):
 			Fail("Could not even receive dummy message")

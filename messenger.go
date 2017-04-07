@@ -67,7 +67,7 @@ func NewKafkaMessenger(broker string, config *KafkaMessengerConfig) (*KafkaMesse
 	}
 
 	messages := make(chan *pb.Message)
-	stop := make(chan bool)
+	stop := make(chan bool, 1)
 	km := &KafkaMessenger{
 		producer: kafkaProducer,
 		consumer: kafkaConsumer,
@@ -129,8 +129,9 @@ func listen(consumer *cluster.Consumer, messages chan *pb.Message, stop chan boo
 		case msg := <-consumer.Messages():
 			msgObj, err := convertMessage(msg)
 			if err != nil {
-				Logger.Error(err)
+				Logger.Debugln(err)
 				consumer.MarkOffset(msg, "")
+				continue
 			}
 			messages <- msgObj
 		case err := <-consumer.Errors():
@@ -194,7 +195,7 @@ func getMessageMetadata(msg *pb.Message) (string, int32, int64, error) {
 		return "", 0, 0, errors.New("Could not find topic in Message metadata")
 	}
 	if val, ok := msg.Metadata[MESSAGE_OFFSET]; ok {
-		err := errors.New("")
+		var err error
 		offset, err = binary.ReadVarint(bytes.NewReader(val))
 		if err != nil {
 			return "", 0, 0, errors.New("Could read offset as int64")
