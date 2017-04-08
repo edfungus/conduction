@@ -26,9 +26,10 @@ message Path {
 }
 
 message Flow {
-    string name = 1;
-    string description = 2;
-    Path path = 3;
-    repeated Flow dependentFlows = 4; 
-    bool wait = 5;
+    string id = 1;
+    string name = 2;
+    string description = 3;
+    Path path = 4;
+    repeated Flow dependentFlows = 5; 
+    bool wait = 6;
 }

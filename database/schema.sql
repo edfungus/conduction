@@ -1,13 +1,12 @@
+CREATE USER conductor;
 CREATE DATABASE IF NOT EXISTS conduction;
-
 SET DATABASE = conduction;
-
 GRANT ALL ON DATABASE conduction TO conductor;
 
 CREATE TABLE IF NOT EXISTS paths (
     id SERIAL PRIMARY KEY, 
     route STRING NOT NULL, 
-    type STRING NOT NULL,
+    type INT NOT NULL,
     listen BOOL NOT NULL,
     UNIQUE (route, type)
 ); 
