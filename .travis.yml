@@ -3,8 +3,11 @@ language: go
 go:
   - tip
 
+services:
+  - docker
+
 env:
- - KAFKA_URL=localhost:9092
+ - KAFKA_URL=localhost:9092 COCKROACH_URL=localhost:26257
 
 before_install:
   - wget http://apache.claz.org/kafka/0.10.2.0/kafka_2.11-0.10.2.0.tgz -O kafka.tgz
@@ -13,6 +16,10 @@ before_install:
   - sleep 3
   - kafka/bin/kafka-server-start.sh -daemon kafka/config/server.properties
   - sleep 5
+  - wget https://binaries.cockroachdb.com/cockroach-latest.linux-amd64.tgz -O cockroach.tgz
+  - mkdir -p cockroach && tar xzf cockroach.tgz -C cockroach --strip-components 1
+  - nohup bash -c "cockroach/cockroach start &"
+  - sleep 3
   - go get -v github.com/onsi/ginkgo/ginkgo
 
 script:

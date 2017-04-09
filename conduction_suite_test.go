@@ -15,12 +15,16 @@ const (
 )
 
 var (
-	kafkaBroker string = "localhost:9092" // Override with KAFKA_URL
+	kafkaBroker  string = "localhost:9092"  // Override with KAFKA_URL
+	cockroachURL string = "localhost:26257" // Override with COCKROACH_URL
 )
 
 func TestConduction(t *testing.T) {
 	if os.Getenv("KAFKA_URL") != "" {
 		kafkaBroker = os.Getenv("KAFKA_URL")
+	}
+	if os.Getenv("COCKROACH_URL") != "" {
+		cockroachURL = os.Getenv("COCKROACH_URL")
 	}
 
 	RegisterFailHandler(Fail)

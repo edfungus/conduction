@@ -1,7 +1,6 @@
-CREATE USER conductor;
+-- Expects user `conductor` to have already been made with `cockroach user set conductor`
 CREATE DATABASE IF NOT EXISTS conduction;
 SET DATABASE = conduction;
-GRANT ALL ON DATABASE conduction TO conductor;
 
 CREATE TABLE IF NOT EXISTS paths (
     id SERIAL PRIMARY KEY, 
