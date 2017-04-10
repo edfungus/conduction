@@ -6,7 +6,6 @@ CREATE TABLE IF NOT EXISTS paths (
     id SERIAL PRIMARY KEY, 
     route STRING NOT NULL, 
     type INT NOT NULL,
-    listen BOOL NOT NULL,
     UNIQUE (route, type)
 ); 
 
@@ -16,6 +15,7 @@ CREATE TABLE IF NOT EXISTS flows (
     name STRING NOT NULL, 
     description STRING, 
     wait BOOL NOT NULL,
+    listen BOOL NOT NULL,    
     PRIMARY KEY ("path", id),
     CONSTRAINT fk_pathId FOREIGN KEY ("path") REFERENCES paths
     ) INTERLEAVE IN PARENT paths ("path")

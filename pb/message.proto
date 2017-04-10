@@ -32,4 +32,5 @@ message Flow {
     Path path = 4;
     repeated Flow dependentFlows = 5; 
     bool wait = 6;
+    bool listen = 7;
 }
