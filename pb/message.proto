@@ -26,7 +26,7 @@ message Path {
 }
 
 message Flow {
-    string id = 1;
+    int64 id = 1;
     string name = 2;
     string description = 3;
     Path path = 4;

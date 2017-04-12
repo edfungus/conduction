@@ -1,6 +1,6 @@
 -- Expects user `conductor` to have already been made with `cockroach user set conductor`
-CREATE DATABASE IF NOT EXISTS conduction;
-SET DATABASE = conduction;
+-- CREATE DATABASE IF NOT EXISTS conduction; This is now done in init
+-- SET DATABASE = conduction; This is also done in init
 
 CREATE TABLE IF NOT EXISTS paths (
     id SERIAL PRIMARY KEY, 
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS flow_dependency (
     dependent_path INT NOT NULL,
     dependent_flow INT NOT NULL,
     PRIMARY KEY (parent_path, parent_flow, position),
-    CONSTRAINT fk_parent_flow FOREIGN KEY (parent_path, parent_flow) REFERENCES conduction.flows,
-    CONSTRAINT fk_dependent_flow FOREIGN KEY (dependent_path, dependent_flow) REFERENCES conduction.flows
+    CONSTRAINT fk_parent_flow FOREIGN KEY (parent_path, parent_flow) REFERENCES flows,
+    CONSTRAINT fk_dependent_flow FOREIGN KEY (dependent_path, dependent_flow) REFERENCES flows
     ) INTERLEAVE IN PARENT flows (parent_path, parent_flow)
 ;
