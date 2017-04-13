@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	. "github.com/edfungus/conduction"
+	"github.com/edfungus/conduction/pb"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -14,6 +15,18 @@ import (
 
 var _ = Describe("Conduction", func() {
 	Describe("Storage", func() {
+		var cs *CockroachStorage
+		BeforeEach(func() {
+			err := dropDatabase(cockroachURL, databaseName)
+			Expect(err).To(BeNil())
+
+			cs, err = NewCockroachStorage(cockroachURL, databaseName)
+			Expect(err).To(BeNil())
+			Expect(cs).ToNot(BeNil())
+		})
+		AfterEach(func() {
+			cs.Close()
+		})
 		Describe("Given creating a new Storage", func() {
 			Context("When Cockroach is not available", func() {
 				It("Then an error should occur", func() {
@@ -29,41 +42,79 @@ var _ = Describe("Conduction", func() {
 				})
 			})
 		})
-		Describe("Given checking if Path exists", func() {
-			Context("When Path does exists in the database", func() {
-				It("Then `true` should be returned", func() {
+		Describe("Given saving a Path", func() {
+			Context("When Path does not exists in the database", func() {
+				It("Then a new Path is insert and id is returned", func() {
+					// Insert Path
+					path := &pb.Path{
+						Route: "/testRoute/pathTest/1",
+						Type:  0,
+					}
+					id, err := cs.SavePath(path)
+					Expect(err).To(BeNil())
+					Expect(id).ToNot(BeNil())
+
+					// Make sure it was actually inserted
+					var (
+						readId    int64
+						readRoute string
+						readType  pb.Path_ConnectorType
+					)
+					err = cs.DB.QueryRow("SELECT id, route, type FROM paths WHERE route=$1 AND type=$2", path.Route, path.Type).Scan(&readId, &readRoute, &readType)
+					Expect(err).To(BeNil())
+					Expect(readId).To(Equal(id))
+					Expect(readRoute).To(Equal(path.Route))
+					Expect(readType).To(Equal(path.Type))
 				})
 			})
-			Context("When Path does not exists in the database", func() {
-				It("Then `false` should be returned", func() {
+			Context("When Path does exists in the database", func() {
+				It("Then only the id is returned", func() {
+					// Insert Path so it exists
+					path := &pb.Path{
+						Route: "/testRoute/pathTest/2",
+						Type:  0,
+					}
+					id, err := cs.SavePath(path)
+					Expect(err).To(BeNil())
+					Expect(id).ToNot(BeNil())
+
+					// Insert same Path again
+					id, err = cs.SavePath(path)
+					Expect(err).To(BeNil())
+					Expect(id).ToNot(BeNil())
+
+					// Make sure it was not insert more than once
+					var (
+						readId    int64
+						readRoute string
+						readType  pb.Path_ConnectorType
+					)
+					rows, err := cs.DB.Query("SELECT id, route, type FROM paths WHERE route=$1 AND type=$2", path.Route, path.Type)
+					defer rows.Close()
+					Expect(err).To(BeNil())
+					Expect(rows.Next()).To(Equal(true))
+
+					err = rows.Scan(&readId, &readRoute, &readType)
+					Expect(err).To(BeNil())
+					Expect(rows.Next()).To(Equal(false))
+					Expect(readId).To(Equal(id))
+					Expect(readRoute).To(Equal(path.Route))
+					Expect(readType).To(Equal(path.Type))
 				})
 			})
 		})
 		Describe("Given checking if Flow id exists", func() {
-			var (
-				cs     *CockroachStorage
-				flowId int64 = 0
-			)
+			var flowId int64 = 0
 			BeforeEach(func() {
-				err := dropDatabase(cockroachURL, databaseName)
-				Expect(err).To(BeNil())
-
-				cs, err = NewCockroachStorage(cockroachURL, databaseName)
-				Expect(err).To(BeNil())
-				Expect(cs).ToNot(BeNil())
-
-				// In future, replace with some insert flow function!
+				// Inserting new Flow. In future, replace with some insert flow function!
 				pathId := 0
-				err = cs.DB.QueryRow("INSERT INTO paths(route, type) VALUES($1, $2) RETURNING id", "/testRoute", 0).Scan(&pathId)
+				err := cs.DB.QueryRow("INSERT INTO paths(route, type) VALUES($1, $2) RETURNING id", "/testRoute", 0).Scan(&pathId)
 				Expect(err).To(BeNil())
 				Expect(pathId).ToNot(Equal(0))
 
 				err = cs.DB.QueryRow("INSERT INTO flows(\"path\", name, wait, listen) VALUES($1, $2, $3, $4) RETURNING id", pathId, "Test Flow", false, false).Scan(&flowId)
 				Expect(err).To(BeNil())
 				Expect(flowId).ToNot(Equal(0))
-			})
-			AfterEach(func() {
-				cs.Close()
 			})
 			Context("When Flow id does exists in the database", func() {
 				It("Then `true` should be returned", func() {
@@ -145,9 +196,7 @@ func dropDatabase(cockroachURL string, databaseName string) error {
 	if err != nil {
 		return err
 	}
-	_, err = db.Exec(fmt.Sprintf("DROP DATABASE %s", databaseName))
-	if err != nil {
-		return err
-	}
+
+	db.Exec(fmt.Sprintf("DROP DATABASE %s", databaseName))
 	return nil
 }

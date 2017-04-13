@@ -13,7 +13,7 @@ import (
 type Storage interface {
 	// PathListen(path pb.Path) (map[string]pb.Flow, error)                     // Check if path is being listened to and return associated flows
 	// FindFlow(path pb.Path) (map[string]pb.Flow, error)                       // Gets flows from a path. Could be multiple therefore the id is important to identify
-	// GetFlow(id string) (pb.Flow, error)                                      // Gets a flow based on the id
+	GetFlow(id string) (*pb.Flow, error)                                     // Gets a flow based on the id
 	SaveFlowFull(flow *pb.Flow) (string, error)                              // Adds/update a flow. Will traverse through dependent flows and add if not yet made and replace existing contents will given
 	SaveFlowSingle(flow *pb.Flow, dependentFlowIDs []string) (string, error) // Adds/updates only the flow passed in. Will not traverse. Dependent flows provide by IDs not Flow
 	// DeleteFlow(id string) error                                              // Deletes the flow and removes from all relationships. Path may stay only if another flow uses it
@@ -100,16 +100,47 @@ func (cs *CockroachStorage) SaveFlowFull(flow *pb.Flow) (int64, error) {
 	return flowID, nil
 }
 
+// SaveFlowSingle updates or inserts a Flow without traversing into dependents. A list of Flow ids `dependentFlowIDs` is used instead of the `Flow.dependentFlows` so that Flow objects do not need ot be made.
 func (cs *CockroachStorage) SaveFlowSingle(flow *pb.Flow, dependentFlowIDs []int64) (int64, error) {
+	// If Flow has an existing id, get old Flow. A flow with no id (default zero value) then the flow needs to be created
+	var oldFlow *pb.Flow
 	if flow.Id != 0 {
 		ok, err := cs.FlowIDExist(flow.Id)
-		if err != nil {
+		switch {
+		case err != nil:
 			return 0, err
+		case !ok:
+			return 0, fmt.Errorf("Flow id %d was not found in database", flow.Id)
 		}
-		if !ok {
-			return 0, fmt.Errorf("Flow id %s was not found in database", flow.Id)
+		oldFlow, err = cs.GetFlow(flow.Id)
+	}
+
+	// Ensure that all Flow dependents exists
+	for i := 0; i < len(dependentFlowIDs); i++ {
+		ok, err := cs.FlowIDExist(dependentFlowIDs[i])
+		switch {
+		case err != nil:
+			return 0, err
+		case !ok:
+			return 0, fmt.Errorf("Flow dependent id %d was not found in database", dependentFlowIDs[i])
 		}
 	}
+
+	// Ensure new Path is added to database
+	_, err := cs.SavePath(flow.Path)
+	if err != nil {
+		return 0, err
+	}
+
+	// Update/insert??
+
+	// Clean up old stuff if possible
+	if oldFlow != nil && oldFlow.Path != flow.Path {
+		// check to see if we need to delete old Path... DeletePath() should only delete if nothing relies on it... so maybe call it anyways?
+	}
+
+	// *** need cases where if this is an update... check if old and new path changed.. also do this for dependents!
+
 	// Check if all dependent flows ids exist (if not nil) .. if not error
 	// Check if path exists, if not make it
 	// Update/insert new properties
@@ -118,16 +149,33 @@ func (cs *CockroachStorage) SaveFlowSingle(flow *pb.Flow, dependentFlowIDs []int
 	return 0, fmt.Errorf("Function not done...")
 }
 
-// pathExist returns whether or not Path exists in database
-func (cs *CockroachStorage) pathExist(path pb.Path) (bool, error) {
-	return false, fmt.Errorf("Function not done...")
+// GetFlow gets a Flow by id. If flow does not exist, a nil value will be returned
+func (cs *CockroachStorage) GetFlow(id int64) (*pb.Flow, error) {
+	return nil, fmt.Errorf("Function not done...")
+}
+
+// SavePath saves a Path to the database and return the id. If the path is already in the database, it will just return the id
+func (cs *CockroachStorage) SavePath(path *pb.Path) (int64, error) {
+	var pathID int64
+	// See if path already exist
+	err := cs.DB.QueryRow("SELECT id FROM paths WHERE route=$1 AND type=$2", path.Route, path.Type).Scan(&pathID)
+	if err == sql.ErrNoRows {
+		// Insert new Path
+		err := cs.DB.QueryRow("INSERT INTO paths(route, type) VALUES($1, $2) RETURNING id", path.Route, path.Type).Scan(&pathID)
+		if err != nil {
+			return 0, err
+		}
+	} else if err != nil {
+		return 0, err
+	}
+
+	return pathID, nil
 }
 
 // FlowIDExist returns whether or not Flow id exists in database
 func (cs *CockroachStorage) FlowIDExist(id int64) (bool, error) {
-	row := cs.DB.QueryRow("SELECT id FROM flows WHERE id = $1", id)
-	var expectedRow int64
-	err := row.Scan(&expectedRow)
+	var flowID int64
+	err := cs.DB.QueryRow("SELECT id FROM flows WHERE id = $1", id).Scan(&flowID)
 	if err != nil {
 		switch {
 		case err == sql.ErrNoRows:
