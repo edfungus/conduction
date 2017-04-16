@@ -3,7 +3,6 @@
 package main_test
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/Shopify/sarama"
@@ -22,9 +21,6 @@ var _ = Describe("Conduction", func() {
 				InputTopic:    kafkaInputTopic,
 			}
 		)
-		BeforeSuite(func() {
-			ClearKafkaTopic(kafkaBroker, kafkaInputTopic, kafkaConsumerGroup)
-		})
 		Describe("Given creating a new Messenger", func() {
 			Context("When Kafka is not available", func() {
 				It("Then an error should occur", func() {
@@ -134,44 +130,3 @@ var _ = Describe("Conduction", func() {
 		})
 	})
 })
-
-func ClearKafkaTopic(broker string, topic string, consumerGroup string) {
-	messenger, err := NewKafkaMessenger(broker, &KafkaMessengerConfig{
-		ConsumerGroup: consumerGroup,
-		InputTopic:    topic,
-	})
-	if err != nil {
-		Fail(fmt.Sprintf("Could not connec to Kafka. Is Kafka running on %s? Error: %s", broker, err.Error()))
-	}
-	defer messenger.Close()
-
-	// Send dummy message
-	err = messenger.Send(topic, &pb.Message{
-		Payload: []byte("payload"),
-	})
-	Expect(err).To(BeNil())
-
-	stop := make(chan bool, 1)
-	firstMessage := true
-	count := 0
-	for {
-		select {
-		case msg := <-messenger.Receive():
-			if firstMessage {
-				firstMessage = false
-				go func() {
-					time.Sleep(time.Second * 2) // Should be long enough to clear any old messages
-					stop <- true
-				}()
-			}
-			messenger.Acknowledge(msg)
-			count++
-		case <-stop:
-			fmt.Printf("Cleared %d message(s)\n", count)
-			return
-		case <-time.After(time.Second * 30):
-			Fail("Could not even receive dummy message")
-			return
-		}
-	}
-}

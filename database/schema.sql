@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS flows (
     "path" INT,    
     id SERIAL, 
     name STRING NOT NULL, 
-    description STRING, 
+    description STRING DEFAULT '', 
     wait BOOL NOT NULL,
     listen BOOL NOT NULL,    
     PRIMARY KEY ("path", id),

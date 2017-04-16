@@ -3,9 +3,6 @@
 package main_test
 
 import (
-	"database/sql"
-	"fmt"
-
 	. "github.com/edfungus/conduction"
 	"github.com/edfungus/conduction/pb"
 
@@ -17,9 +14,7 @@ var _ = Describe("Conduction", func() {
 	Describe("Storage", func() {
 		var cs *CockroachStorage
 		BeforeEach(func() {
-			err := dropDatabase(cockroachURL, databaseName)
-			Expect(err).To(BeNil())
-
+			var err error
 			cs, err = NewCockroachStorage(cockroachURL, databaseName)
 			Expect(err).To(BeNil())
 			Expect(cs).ToNot(BeNil())
@@ -39,6 +34,7 @@ var _ = Describe("Conduction", func() {
 					db, err := NewCockroachStorage(cockroachURL, databaseName)
 					Expect(err).To(BeNil())
 					Expect(db).ToNot(BeNil())
+					db.Close()
 				})
 			})
 		})
@@ -104,17 +100,24 @@ var _ = Describe("Conduction", func() {
 			})
 		})
 		Describe("Given checking if Flow id exists", func() {
-			var flowId int64 = 0
+			var (
+				done   bool  = false
+				flowId int64 = 0
+			)
 			BeforeEach(func() {
-				// Inserting new Flow. In future, replace with some insert flow function!
-				pathId := 0
-				err := cs.DB.QueryRow("INSERT INTO paths(route, type) VALUES($1, $2) RETURNING id", "/testRoute", 0).Scan(&pathId)
-				Expect(err).To(BeNil())
-				Expect(pathId).ToNot(Equal(0))
+				if !done {
+					// Inserting new Flow. In future, replace with some insert flow function!
+					pathId := 0
+					err := cs.DB.QueryRow("INSERT INTO paths(route, type) VALUES($1, $2) RETURNING id", "/testRoute/FlowIDExist", 0).Scan(&pathId)
+					Expect(err).To(BeNil())
+					Expect(pathId).ToNot(Equal(0))
 
-				err = cs.DB.QueryRow("INSERT INTO flows(\"path\", name, wait, listen) VALUES($1, $2, $3, $4) RETURNING id", pathId, "Test Flow", false, false).Scan(&flowId)
-				Expect(err).To(BeNil())
-				Expect(flowId).ToNot(Equal(0))
+					err = cs.DB.QueryRow("INSERT INTO flows(\"path\", name, wait, listen) VALUES($1, $2, $3, $4) RETURNING id", pathId, "Test Flow", false, false).Scan(&flowId)
+					Expect(err).To(BeNil())
+					Expect(flowId).ToNot(Equal(0))
+
+					done = true
+				}
 			})
 			Context("When Flow id does exists in the database", func() {
 				It("Then `true` should be returned", func() {
@@ -131,28 +134,118 @@ var _ = Describe("Conduction", func() {
 				})
 			})
 		})
+		Describe("Given reading a single Flow", func() {
+			var (
+				done    bool = false
+				flow1ID int64
+				flow2ID int64
+				flow3ID int64
+			)
+
+			const (
+				flow1Name string = "Test Flow1"
+				flow2Name string = "Test Flow2"
+				route     string = "/testRoute/GetFlowSingle"
+			)
+			BeforeEach(func() {
+				if !done {
+					// Insert 3 flows where 1 Flow has 2 dependents (REPLACE when insert flow function is made)
+					pathId := 0
+					err := cs.DB.QueryRow("INSERT INTO paths(route, type) VALUES($1, $2) RETURNING id", route, 0).Scan(&pathId)
+					Expect(err).To(BeNil())
+					Expect(pathId).ToNot(Equal(0))
+
+					err = cs.DB.QueryRow("INSERT INTO flows(\"path\", name, wait, listen) VALUES($1, $2, $3, $4) RETURNING id", pathId, flow1Name, false, false).Scan(&flow1ID)
+					Expect(err).To(BeNil())
+					Expect(flow1ID).ToNot(Equal(0))
+
+					err = cs.DB.QueryRow("INSERT INTO flows(\"path\", name, wait, listen) VALUES($1, $2, $3, $4) RETURNING id", pathId, flow2Name, false, false).Scan(&flow2ID)
+					Expect(err).To(BeNil())
+					Expect(flow2ID).ToNot(Equal(0))
+
+					err = cs.DB.QueryRow("INSERT INTO flows(\"path\", name, wait, listen) VALUES($1, $2, $3, $4) RETURNING id", pathId, "Test Flow3", false, false).Scan(&flow3ID)
+					Expect(err).To(BeNil())
+					Expect(flow3ID).ToNot(Equal(0))
+
+					_, err = cs.DB.Exec("INSERT INTO flow_dependency(parent_path, parent_flow, dependent_path, dependent_flow, position) VALUES((SELECT \"path\" FROM flows WHERE id=$1), $1, (SELECT \"path\" FROM flows WHERE id=$2), $2, $3)", flow1ID, flow2ID, 0)
+					Expect(err).To(BeNil())
+
+					_, err = cs.DB.Exec("INSERT INTO flow_dependency(parent_path, parent_flow, dependent_path, dependent_flow, position) VALUES((SELECT \"path\" FROM flows WHERE id=$1), $1, (SELECT \"path\" FROM flows WHERE id=$2), $2, $3)", flow1ID, flow3ID, 1)
+					Expect(err).To(BeNil())
+
+					done = true
+				}
+			})
+			Context("When the Flow does not exist", func() {
+				It("Then an error should be thrown", func() {
+					var expectedDenpendents []int64
+					flow, dependents, err := cs.GetFlowSingle(flow1ID + 1)
+					Expect(err).ToNot(BeNil())
+					Expect(flow).To(BeNil())
+					Expect(dependents).To(Equal(expectedDenpendents))
+				})
+			})
+			Context("When the Flow has no dependents", func() {
+				It("Then return the Flow with an empty dependent array", func() {
+					var expectedDenpendents []int64
+					flow, dependents, err := cs.GetFlowSingle(flow2ID)
+					Expect(err).To(BeNil())
+					Expect(flow).ToNot(BeNil())
+					Expect(flow.Name).To(Equal(flow2Name))
+					Expect(flow.Path.Route).To(Equal(route))
+					Expect(dependents).To(Equal(expectedDenpendents))
+				})
+			})
+			Context("When the Flow has multiple dependents", func() {
+				It("Then return the Flow with a populated dependent array", func() {
+					expectedDenpendents := []int64{flow2ID, flow3ID}
+					flow, dependents, err := cs.GetFlowSingle(flow1ID)
+					Expect(err).To(BeNil())
+					Expect(flow).ToNot(BeNil())
+					Expect(flow.Name).To(Equal(flow1Name))
+					Expect(flow.Path.Route).To(Equal(route))
+					Expect(dependents).To(Equal(expectedDenpendents))
+				})
+			})
+		})
 		Describe("Given adding a Flow without traversing deeper", func() {
-			Describe("When the Flow id does not exist in database", func() {
+			Context("When the Flow id does not exist in database", func() {
 				It("Then an error should be thrown and nothing should be added to the database", func() {
 
 				})
 			})
-			Describe("When the Flow is missing id", func() {
+			Context("When the Flow is missing id", func() {
 				It("Then a new Flow should be made", func() {
 
 				})
 			})
-			Describe("When the Flow is correct and dependents arg is nil", func() {
+			Context("When the Flow is correct and dependents arg is nil", func() {
 				It("Then the Flow should be updated without touching dependents and without an error", func() {
 				})
 			})
-			Describe("When the dependent Flow id does not exist", func() {
+			Context("When the dependent Flow id does not exist", func() {
 				It("Then an error should be thrown", func() {
 
 				})
 			})
-			Describe("When the Flow is correct and dependents arg is not nil", func() {
+			Context("When the Flow is correct and dependents arg is not nil", func() {
 				It("Then the Flow should be updated with dependents and without an error", func() {
+				})
+			})
+			Context("When the Flow Path is change the old Path is no longer used", func() {
+				It("Then the Flow should be updated and old Path removed", func() {
+				})
+			})
+			Context("When the Flow Path is change the old Path is still used", func() {
+				It("Then the Flow should be updated and old Path should not be removed", func() {
+				})
+			})
+			Context("When the Flow dependent is removed and the dependent is not used and listen is false", func() {
+				It("Then the Flow should be updated and old Flow removed", func() {
+				})
+			})
+			Context("When the Flow dependent is removed and the dependent is used or listen is true", func() {
+				It("Then the Flow should be updated and old Flow should not be removed", func() {
 				})
 			})
 		})
@@ -190,13 +283,3 @@ var _ = Describe("Conduction", func() {
 		})
 	})
 })
-
-func dropDatabase(cockroachURL string, databaseName string) error {
-	db, err := sql.Open("postgres", fmt.Sprintf(DATABASE_URL, "root", cockroachURL, databaseName))
-	if err != nil {
-		return err
-	}
-
-	db.Exec(fmt.Sprintf("DROP DATABASE %s", databaseName))
-	return nil
-}
