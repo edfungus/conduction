@@ -1,9 +1,7 @@
 # Conduction [![Build Status](https://travis-ci.org/edfungus/conduction.svg?branch=master)](https://travis-ci.org/edfungus/conduction)
 
 ### Description
-Event based Kafka router; second times the charm!
-
-[Last commit of previous attempt](https://github.com/edfungus/conduction/tree/892cf01f4c0c2b669f69b1d6aa1077ce7e7bf66f)
+Work in progress! Event based Kafka router between protocols. A centralized router that can send messages between protocols. This allows easy rerouting without changing client code and a high level view to understand the communication between clients. 
 
 ```
 ./protoc -I=/Users/edmundfung/workspace/go/src/github.com/edfungus/conduction/pb --go_out=/Users/edmundfung/workspace/go/src/github.com/edfungus/conduction/pb/ /Users/edmundfung/workspace/go/src/github.com/edfungus/conduction/pb/message.proto 
