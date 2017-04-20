@@ -1,4 +1,4 @@
-// +build all integration
+// +build old
 
 package main_test
 

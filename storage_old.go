@@ -10,9 +10,9 @@ import (
 	"github.com/edfungus/conduction/pb"
 )
 
-type Storage interface {
+type Storage_old interface {
 	// PathListen(path pb.Path) (map[string]pb.Flow, error)                     // Check if path is being listened to and return associated flows
-	// FindFlow(path pb.Path) (map[string]pb.Flow, error)                       // Gets flows from a path. Could be multiple therefore the id is important to identify
+	FindFlow(path pb.Path) (map[string]pb.Flow, error)                       // Gets flows from a path. Could be multiple therefore the id is important to identify
 	GetFlowFull(id string) (*pb.Flow, error)                                 // Gets a flow based on the id
 	SaveFlowFull(flow *pb.Flow) (string, error)                              // Adds/update a flow. Will traverse through dependent flows and add if not yet made and replace existing contents will given
 	SaveFlowSingle(flow *pb.Flow, dependentFlowIDs []string) (string, error) // Adds/updates only the flow passed in. Will not traverse. Dependent flows provide by IDs not Flow
@@ -119,18 +119,13 @@ func (cs *CockroachStorage) SaveFlowSingle(flow *pb.Flow, dependentFlowIDs []int
 	}
 
 	// Ensure that all Flow dependents exists
-	for i := 0; i < len(dependentFlowIDs); i++ {
-		ok, err := cs.FlowIDExist(dependentFlowIDs[i])
-		switch {
-		case err != nil:
-			return 0, err
-		case !ok:
-			return 0, fmt.Errorf("Flow dependent id %d was not found in database", dependentFlowIDs[i])
-		}
+	err := cs.FlowIDsExist(dependentFlowIDs)
+	if err != nil {
+		return 0, err
 	}
 
 	// Ensure new Path is added to database
-	_, err := cs.SavePath(flow.Path)
+	_, err = cs.SavePath(flow.Path)
 	if err != nil {
 		return 0, err
 	}
@@ -139,11 +134,17 @@ func (cs *CockroachStorage) SaveFlowSingle(flow *pb.Flow, dependentFlowIDs []int
 
 	// Clean up old stuff if possible
 	if oldFlow != nil && oldFlow.Path != flow.Path {
+		// SQL query count for the old path
+		count := 0
+		err := cs.DB.QueryRow("SELECT COUNT(flows.id) FROM flows INNER JOIN paths ON flows.\"path\"=paths.id WHERE paths.route=$1 AND paths.type=$2", oldFlow.Path.Route, oldFlow.Path.Type).Scan(&count)
+		if err != nil {
+
+		}
 		// check to see if we need to delete old Path... DeletePath() should only delete if nothing relies on it... so maybe call it anyways?
 	}
 	if oldFlowDependents != nil {
-		// are orphan flows ok???
-		// function to see what ids are in flowDependent but not the new dependents ...
+		// check if anything is using it and if it has a listen flag.. if neither, than delete
+		// go into dependents to delete those also
 	}
 
 	// Check if all dependent flows ids exist (if not nil) .. if not error
@@ -201,6 +202,20 @@ func (cs *CockroachStorage) SavePath(path *pb.Path) (int64, error) {
 		return 0, err
 	}
 	return pathID, nil
+}
+
+// FlowIDsExist return whether of not all the ids in the list exists
+func (cs *CockroachStorage) FlowIDsExist(ids []int64) error {
+	for i := 0; i < len(ids); i++ {
+		ok, err := cs.FlowIDExist(ids[i])
+		switch {
+		case err != nil:
+			return err
+		case !ok:
+			return fmt.Errorf("Flow dependent id %d was not found in database", ids[i])
+		}
+	}
+	return nil
 }
 
 // FlowIDExist returns whether or not Flow id exists in database

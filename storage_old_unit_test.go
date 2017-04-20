@@ -1,4 +1,4 @@
-// +build all unit
+// +build old
 
 package main_test
 
