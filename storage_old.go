@@ -28,12 +28,12 @@ const (
 	SCHEMA_FILE   string = "./database/schema.sql"
 	DATABASE_USER string = "conductor"
 	// DATABASE_NAME string = "conduction"
-	DATABASE_URL string = "postgresql://%s@%s/%s?sslmode=disable"
+	DATABASE_URL_old string = "postgresql://%s@%s/%s?sslmode=disable"
 )
 
 // NewCockroachStorage returns a new cockroach storage object
 func NewCockroachStorage(url string, databaseName string) (*CockroachStorage, error) {
-	initdb, err := sql.Open("postgres", fmt.Sprintf(DATABASE_URL, "root", url, databaseName))
+	initdb, err := sql.Open("postgres", fmt.Sprintf(DATABASE_URL_old, "root", url, databaseName))
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func NewCockroachStorage(url string, databaseName string) (*CockroachStorage, er
 	}
 	initdb.Close()
 
-	db, err := sql.Open("postgres", fmt.Sprintf(DATABASE_URL, DATABASE_USER, url, databaseName))
+	db, err := sql.Open("postgres", fmt.Sprintf(DATABASE_URL_old, DATABASE_USER, url, databaseName))
 	if err != nil {
 		return nil, err
 	}

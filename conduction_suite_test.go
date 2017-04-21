@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	. "github.com/edfungus/conduction"
@@ -21,21 +22,29 @@ const (
 )
 
 var (
-	kafkaBroker  string = "localhost:9092"  // Override with KAFKA_URL if necessary
-	cockroachURL string = "localhost:26257" // Override with DATABASE_URL if necessary
+	kafkaBroker  string = "localhost:9092" // Override with KAFKA_URL if necessary
+	databaseHost string = "localhost"      // Override with DATABASE_HOST if necessary
+	databasePort int    = 26257            // Override with DATABASE_PORT if necessary
 )
 
 func TestConduction(t *testing.T) {
 	if os.Getenv("KAFKA_URL") != "" {
 		kafkaBroker = os.Getenv("KAFKA_URL")
 	}
-	if os.Getenv("DATABASE_URL") != "" {
-		cockroachURL = os.Getenv("DATABASE_URL")
+	if os.Getenv("DATABASE_HOST") != "" {
+		databaseHost = os.Getenv("DATABASE_HOST")
+	}
+	if os.Getenv("DATABASE_PORT") != "" {
+		var err error
+		databasePort, err = strconv.Atoi(os.Getenv("DATABASE_PORT"))
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	ClearKafkaTopic(kafkaBroker, kafkaInputTopic, kafkaConsumerGroup)
 
-	err := dropDatabase(cockroachURL, databaseName)
+	err := dropDatabase(databaseHost, databasePort, databaseName)
 	if err != nil {
 		panic(err)
 	}
@@ -87,8 +96,9 @@ func ClearKafkaTopic(broker string, topic string, consumerGroup string) {
 	}
 }
 
-func dropDatabase(cockroachURL string, databaseName string) error {
-	db, err := sql.Open("postgres", fmt.Sprintf(DATABASE_URL, "root", cockroachURL, databaseName))
+func dropDatabase(databaseHost string, databasePort int, databaseName string) error {
+	databasePath := fmt.Sprintf(DATABASE_URL, "root", databaseHost, databasePort, databaseName)
+	db, err := sql.Open("postgres", databasePath)
 	if err != nil {
 		return err
 	}

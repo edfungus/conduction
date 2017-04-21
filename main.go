@@ -9,7 +9,6 @@ var Logger = logrus.New()
 
 func main() {
 	Logger.Info("Hello Conduction!")
-
 }
 
 func setupLogger() {
