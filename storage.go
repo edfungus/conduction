@@ -25,10 +25,16 @@ type GraphStorage struct {
 }
 
 type flowDTO struct {
-	rdfType     struct{} `quad:"@type > flowDTO"`
-	ID          string   `quad:"@id"`
+	ID          quad.IRI `quad:"@id"`
 	Name        string   `quad:"name"`
-	Description string   `quad:"description,opt"`
+	Description string   `quad:"description"`
+	Path        *pathDTO `quad:"path"`
+}
+
+type pathDTO struct {
+	ID    quad.IRI `quad:"@id"`
+	Route string   `quad:"route"`
+	Type  string   `quad:"type"`
 }
 
 const (
@@ -59,37 +65,48 @@ func NewGraphStorage(config *GraphStorageConfig) (*GraphStorage, error) {
 	}, nil
 }
 
+// AddFlow adds a new Flow to the graph. If the Path does not exist, it will be added, else it will be made
 func (gs *GraphStorage) AddFlow(flow *pb.Flow) (string, error) {
-	newUUID := uuid.NewRandom().String()
-	fmt.Println(newUUID)
-	test := flowDTO{
-		ID:          newUUID,
+	pathUUID := fmt.Sprintf("path:%s", uuid.NewRandom().String())
+	flowUUID := fmt.Sprintf("flow:%s", uuid.NewRandom().String())
+	flowDTO := flowDTO{
+		ID:          toQuadIRI(flowUUID),
 		Name:        flow.Name,
 		Description: flow.Description,
+		Path: &pathDTO{
+			ID:    toQuadIRI(pathUUID),
+			Route: flow.Path.Route,
+			Type:  flow.Path.Type,
+		},
 	}
-	_, err := schema.WriteAsQuads(gs.qw, test)
+	_, err := schema.WriteAsQuads(gs.qw, flowDTO)
 	if err != nil {
 		return "", err
 	}
-	return newUUID, nil
+	return flowUUID, nil
 }
 
+// ReadFlow returns a Flow of the sepcified uuid from the graph
 func (gs *GraphStorage) ReadFlow(uuid string) (*pb.Flow, error) {
 	var flowDTO flowDTO
-	err := schema.LoadTo(nil, gs.store, &flowDTO, toQuadID(uuid))
+	err := schema.LoadTo(nil, gs.store, &flowDTO, toQuadIRI(uuid))
 	if err != nil {
 		return nil, err
 	}
 	return &pb.Flow{
 		Name:        flowDTO.Name,
 		Description: flowDTO.Description,
+		Path: &pb.Path{
+			Route: flowDTO.Path.Route,
+			Type:  flowDTO.Path.Type,
+		},
 	}, nil
 }
 
 // func (gs *GraphStorage) SavePath(path pb.Path) error {
 // }
 
-func toQuadID(uuid string) quad.IRI {
+func toQuadIRI(uuid string) quad.IRI {
 	return quad.IRI(uuid).Full().Short()
 }
 

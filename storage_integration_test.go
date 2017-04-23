@@ -56,7 +56,12 @@ var _ = Describe("Conduction", func() {
 			Context("When the Flow is simplified to name and description", func() {
 				It("Then the Flow should be inserted and an UUID is returned", func() {
 					flow := &pb.Flow{
-						Name: "Edmund",
+						Name:        "Flow Name",
+						Description: "Flow Description",
+						Path: &pb.Path{
+							Route: "/test",
+							Type:  "mqtt",
+						},
 					}
 					id, err := graph.AddFlow(flow)
 					Expect(err).To(BeNil())
@@ -68,6 +73,8 @@ var _ = Describe("Conduction", func() {
 					Expect(err).To(BeNil())
 					Expect(newFlow.Name).To(Equal(flow.Name))
 					Expect(newFlow.Description).To(Equal(flow.Description))
+					Expect(newFlow.Path.Route).To(Equal(flow.Path.Route))
+					Expect(newFlow.Path.Type).To(Equal(flow.Path.Type))
 				})
 			})
 			// Context("When the Path exists", func() {
