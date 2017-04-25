@@ -1,4 +1,4 @@
-package main
+package messenger
 
 import (
 	"bytes"
@@ -11,6 +11,7 @@ import (
 	cluster "github.com/bsm/sarama-cluster"
 	"github.com/edfungus/conduction/pb"
 	"github.com/golang/protobuf/proto"
+	"github.com/sirupsen/logrus"
 )
 
 // Messenger orchestrates communication between conduction modules
@@ -20,6 +21,15 @@ type Messenger interface {
 	Acknowledge(pb.Message) error
 	Close() error
 }
+
+const (
+	MESSAGE_PARTITION string = "messagePartition"
+	MESSAGE_OFFSET    string = "messageOffset"
+	MESSAGE_TOPIC     string = "messageTopic"
+)
+
+// Logger logs but can be replaced
+var Logger = logrus.New()
 
 // KafkaMessenger implements Messenger using Kafka
 type KafkaMessenger struct {
@@ -34,12 +44,6 @@ type KafkaMessengerConfig struct {
 	ConsumerGroup string
 	InputTopic    string
 }
-
-const (
-	MESSAGE_PARTITION string = "messagePartition"
-	MESSAGE_OFFSET    string = "messageOffset"
-	MESSAGE_TOPIC     string = "messageTopic"
-)
 
 // NewKafkaMessenger returns a new KafkaMessenger
 func NewKafkaMessenger(broker string, config *KafkaMessengerConfig) (*KafkaMessenger, error) {

@@ -1,4 +1,4 @@
-package main
+package storage
 
 import (
 	"database/sql"
@@ -6,11 +6,12 @@ import (
 
 	"github.com/cayleygraph/cayley"
 	"github.com/cayleygraph/cayley/graph"
-	_ "github.com/cayleygraph/cayley/graph/sql"
+	_ "github.com/cayleygraph/cayley/graph/sql" // Need for Cayley to connect o database
 	"github.com/cayleygraph/cayley/quad"
 	"github.com/cayleygraph/cayley/schema"
 	"github.com/edfungus/conduction/pb"
 	"github.com/pborman/uuid"
+	"github.com/sirupsen/logrus"
 )
 
 type Storage interface {
@@ -19,9 +20,24 @@ type Storage interface {
 	SavePath(path *pb.Path) error
 }
 
+const (
+	DATABASE_URL string = "postgresql://%s@%s:%d/%s?sslmode=disable"
+)
+
+// Logger logs but can be replaced
+var Logger = logrus.New()
+
 type GraphStorage struct {
 	store *cayley.Handle
 	qw    graph.BatchWriter
+}
+
+type GraphStorageConfig struct {
+	Host         string
+	Port         int
+	User         string
+	DatabaseName string
+	DatabaseType string
 }
 
 type flowDTO struct {
@@ -35,18 +51,6 @@ type pathDTO struct {
 	ID    quad.IRI `quad:"@id"`
 	Route string   `quad:"route"`
 	Type  string   `quad:"type"`
-}
-
-const (
-	DATABASE_URL string = "postgresql://%s@%s:%d/%s?sslmode=disable"
-)
-
-type GraphStorageConfig struct {
-	Host         string
-	Port         int
-	User         string
-	DatabaseName string
-	DatabaseType string
 }
 
 // NewGraphStorage returns a new Storage that uses Cayley and CockroachDB

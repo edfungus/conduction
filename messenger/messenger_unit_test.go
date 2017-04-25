@@ -1,6 +1,6 @@
 // +build all unit
 
-package main
+package messenger
 
 import (
 	"github.com/Shopify/sarama"

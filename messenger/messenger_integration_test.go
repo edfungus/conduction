@@ -1,12 +1,11 @@
 // +build all integration
 
-package main_test
+package messenger
 
 import (
 	"time"
 
 	"github.com/Shopify/sarama"
-	. "github.com/edfungus/conduction"
 
 	"github.com/edfungus/conduction/pb"
 	. "github.com/onsi/ginkgo"

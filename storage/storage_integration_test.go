@@ -1,9 +1,8 @@
 // +build all integration work
 
-package main_test
+package storage
 
 import (
-	. "github.com/edfungus/conduction"
 	"github.com/edfungus/conduction/pb"
 
 	. "github.com/onsi/ginkgo"
