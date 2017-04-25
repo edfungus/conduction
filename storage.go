@@ -52,9 +52,8 @@ type GraphStorageConfig struct {
 // NewGraphStorage returns a new Storage that uses Cayley and CockroachDB
 func NewGraphStorage(config *GraphStorageConfig) (*GraphStorage, error) {
 	databasePath := fmt.Sprintf(DATABASE_URL, config.User, config.Host, config.Port, config.DatabaseName)
-	initDatabase(databasePath, config.DatabaseName)
 	opts := graph.Options{"flavor": config.DatabaseType}
-	graph.InitQuadStore("sql", databasePath, opts)
+	initDatabase(databasePath, config.DatabaseName, opts)
 	store, err := cayley.NewGraph("sql", databasePath, opts)
 	if err != nil {
 		return nil, err
@@ -67,7 +66,7 @@ func NewGraphStorage(config *GraphStorageConfig) (*GraphStorage, error) {
 
 // AddFlow adds a new Flow to the graph. If the Path does not exist, it will be added, else it will be made
 func (gs *GraphStorage) AddFlow(flow *pb.Flow) (string, error) {
-	pathUUID := fmt.Sprintf("path:%s", uuid.NewRandom().String())
+	pathUUID, err := gs.SavePath(flow.Path)
 	flowUUID := fmt.Sprintf("flow:%s", uuid.NewRandom().String())
 	flowDTO := flowDTO{
 		ID:          toQuadIRI(flowUUID),
@@ -79,7 +78,7 @@ func (gs *GraphStorage) AddFlow(flow *pb.Flow) (string, error) {
 			Type:  flow.Path.Type,
 		},
 	}
-	_, err := schema.WriteAsQuads(gs.qw, flowDTO)
+	_, err = schema.WriteAsQuads(gs.qw, flowDTO)
 	if err != nil {
 		return "", err
 	}
@@ -103,21 +102,46 @@ func (gs *GraphStorage) ReadFlow(uuid string) (*pb.Flow, error) {
 	}, nil
 }
 
-// func (gs *GraphStorage) SavePath(path pb.Path) error {
-// }
+func (gs *GraphStorage) SavePath(path *pb.Path) (string, error) {
+	// TODO: Insert Path into graph if it doesn't exist. If it does, just return the id
+
+	// Experiement code to check if path exist....should be working
+	p := cayley.StartPath(gs.store, quad.StringToValue("mqtt-duplicate")).In(quad.StringToValue("<type>")).Has(quad.StringToValue("<route>"), quad.StringToValue("/test2"))
+	fmt.Printf("countOuts: ")
+	pathList, err := p.Iterate(nil).Limit(1).AllValues(gs.store)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(len(pathList))
+
+	return fmt.Sprintf("path:%s", uuid.NewRandom().String()), nil
+}
 
 func toQuadIRI(uuid string) quad.IRI {
 	return quad.IRI(uuid).Full().Short()
 }
 
-func initDatabase(connectionPath string, databaseName string) error {
+func initDatabase(connectionPath string, databaseName string, opts graph.Options) error {
 	initdb, err := sql.Open("postgres", connectionPath)
 	if err != nil {
 		return err
 	}
-	_, err = initdb.Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", databaseName))
+
+	// Check if the database needs to be set up
+	_, err = initdb.Exec(fmt.Sprintf("SET DATABASE = %s", databaseName))
 	if err != nil {
-		return err
+		_, err = initdb.Exec(fmt.Sprintf("CREATE DATABASE %s", databaseName))
+		if err != nil {
+			return err
+		}
 	}
+	_, err = initdb.Exec(fmt.Sprintf("SET DATABASE = %s; SELECT * FROM quads", databaseName))
+	if err != nil {
+		err := graph.InitQuadStore("sql", connectionPath, opts)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }

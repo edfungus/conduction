@@ -6,8 +6,6 @@ import (
 	. "github.com/edfungus/conduction"
 	"github.com/edfungus/conduction/pb"
 
-	"fmt"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -53,21 +51,19 @@ var _ = Describe("Conduction", func() {
 			})
 		})
 		Describe("Given saving a Flow to graph", func() {
-			Context("When the Flow is simplified to name and description", func() {
-				It("Then the Flow should be inserted and an UUID is returned", func() {
+			Context("When the Path does not exist", func() {
+				It("Then the Path and Flow should also be inserted connected to Path", func() {
 					flow := &pb.Flow{
 						Name:        "Flow Name",
 						Description: "Flow Description",
 						Path: &pb.Path{
-							Route: "/test",
-							Type:  "mqtt",
+							Route: "/test2",
+							Type:  "mqtt-duplicate",
 						},
 					}
 					id, err := graph.AddFlow(flow)
 					Expect(err).To(BeNil())
 					Expect(id).ToNot(BeNil())
-
-					fmt.Println(id)
 
 					newFlow, err := graph.ReadFlow(id)
 					Expect(err).To(BeNil())
@@ -77,16 +73,52 @@ var _ = Describe("Conduction", func() {
 					Expect(newFlow.Path.Type).To(Equal(flow.Path.Type))
 				})
 			})
-			// Context("When the Path exists", func() {
-			// 	It("Then the Flow should be inserted connected to existing Path", func() {
+			Context("When the Path exists", func() {
+				It("Then the Flow should be inserted connected to existing Path", func() {
+					// Save Path .. make sure it works
+					path := &pb.Path{
+						Route: "/test",
+						Type:  "mqtt-duplicate",
+					}
+					pathID, err := graph.SavePath(path)
+					Expect(err).To(BeNil())
+					Expect(pathID).ToNot(BeNil())
 
-			// 	})
-			// })
-			// Context("When the Path does not exist", func() {
-			// 	It("Then the Path and Flow should also be inserted connected to Path", func() {
+					// Save flow with same path route and type
+					flow := &pb.Flow{
+						Name:        "Flow Name",
+						Description: "Flow Description",
+						Path: &pb.Path{
+							Route: path.Route,
+							Type:  path.Type,
+						},
+					}
+					flowID, err := graph.AddFlow(flow)
+					Expect(err).To(BeNil())
+					Expect(flowID).ToNot(BeNil())
 
-			// 	})
-			// })
+					// Check that the path was not remade
+					// TODO.. make query to get all nodes attached to /test and mqtt-duplicate... make sure there isn't a double
+
+					newFlow, err := graph.ReadFlow(flowID)
+					Expect(err).To(BeNil())
+					Expect(newFlow.Name).To(Equal(flow.Name))
+					Expect(newFlow.Description).To(Equal(flow.Description))
+					Expect(newFlow.Path.Route).To(Equal(flow.Path.Route))
+					Expect(newFlow.Path.Type).To(Equal(flow.Path.Type))
+				})
+			})
+		})
+		Describe("Given saving a Path to graph", func() {
+			Context("When the Path does already exist", func() {
+				It("Then the Path id should be returned", func() {
+				})
+			})
+			Context("When the Path does not already exist", func() {
+				It("Then a new Path should be inserted and id returned", func() {
+
+				})
+			})
 		})
 	})
 })
