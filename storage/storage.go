@@ -106,19 +106,33 @@ func (gs *GraphStorage) ReadFlow(uuid string) (*pb.Flow, error) {
 	}, nil
 }
 
+// SavePath adds path to graph if new, else it will return the id of the existing path. Path are unique based on route and type combined
 func (gs *GraphStorage) SavePath(path *pb.Path) (string, error) {
-	// TODO: Insert Path into graph if it doesn't exist. If it does, just return the id
-
-	// Experiement code to check if path exist....should be working
-	p := cayley.StartPath(gs.store, quad.StringToValue("mqtt-duplicate")).In(quad.StringToValue("<type>")).Has(quad.StringToValue("<route>"), quad.StringToValue("/test2"))
-	fmt.Printf("countOuts: ")
-	pathList, err := p.Iterate(nil).Limit(1).AllValues(gs.store)
-	if err != nil {
-		fmt.Println(err)
+	// TODO find path by route and type and return id ... not found... do the following
+	pathID := fmt.Sprintf("path:%s", uuid.NewRandom().String())
+	pathDTO := pathDTO{
+		ID:    toQuadIRI(pathID),
+		Route: path.Route,
+		Type:  path.Type,
 	}
-	fmt.Println(len(pathList))
+	_, err := schema.WriteAsQuads(gs.qw, pathDTO)
+	if err != nil {
+		return "", err
+	}
+	return pathID, nil
+}
 
-	return fmt.Sprintf("path:%s", uuid.NewRandom().String()), nil
+// readPath returns Path based on uuid. Used only internally
+func (gs *GraphStorage) readPath(uuid string) (*pb.Path, error) {
+	var pathDTO pathDTO
+	err := schema.LoadTo(nil, gs.store, &pathDTO, toQuadIRI(uuid))
+	if err != nil {
+		return nil, err
+	}
+	return &pb.Path{
+		Route: pathDTO.Route,
+		Type:  pathDTO.Type,
+	}, nil
 }
 
 func toQuadIRI(uuid string) quad.IRI {

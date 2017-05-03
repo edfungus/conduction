@@ -3,6 +3,8 @@
 package storage
 
 import (
+	"github.com/cayleygraph/cayley"
+	"github.com/cayleygraph/cayley/quad"
 	"github.com/edfungus/conduction/pb"
 
 	. "github.com/onsi/ginkgo"
@@ -74,10 +76,12 @@ var _ = Describe("Conduction", func() {
 			})
 			Context("When the Path exists", func() {
 				It("Then the Flow should be inserted connected to existing Path", func() {
-					// Save Path .. make sure it works
+					// Save Path
+					pathRoute := "/test"
+					pathType := "mqtt-duplicate"
 					path := &pb.Path{
-						Route: "/test",
-						Type:  "mqtt-duplicate",
+						Route: pathRoute,
+						Type:  pathType,
 					}
 					pathID, err := graph.SavePath(path)
 					Expect(err).To(BeNil())
@@ -96,9 +100,13 @@ var _ = Describe("Conduction", func() {
 					Expect(err).To(BeNil())
 					Expect(flowID).ToNot(BeNil())
 
-					// Check that the path was not remade
-					// TODO.. make query to get all nodes attached to /test and mqtt-duplicate... make sure there isn't a double
+					// Make sure Path was not recreated
+					p := cayley.StartPath(graph.store, quad.StringToValue(pathType)).In(quad.StringToValue("<type>")).Has(quad.StringToValue("<route>"), quad.StringToValue(pathRoute))
+					pathList, err := p.Iterate(nil).AllValues(graph.store)
+					Expect(err).To(BeNil())
+					Expect(len(pathList)).To(Equal(1))
 
+					// Check that Flow was correctly saved
 					newFlow, err := graph.ReadFlow(flowID)
 					Expect(err).To(BeNil())
 					Expect(newFlow.Name).To(Equal(flow.Name))
@@ -111,11 +119,62 @@ var _ = Describe("Conduction", func() {
 		Describe("Given saving a Path to graph", func() {
 			Context("When the Path does already exist", func() {
 				It("Then the Path id should be returned", func() {
+					// Path to save
+					pathRoute := "/unique/path"
+					pathType := "mqtt-duplicate"
+					path := &pb.Path{
+						Route: pathRoute,
+						Type:  pathType,
+					}
+
+					// Insert Path twice
+					pathID1, err := graph.SavePath(path)
+					pathID2, err := graph.SavePath(path)
+					Expect(pathID1).To(Equal(pathID2))
+
+					// Check Path was added only once
+					p := cayley.StartPath(graph.store, quad.StringToValue(pathType)).In(quad.StringToValue("<type>")).Has(quad.StringToValue("<route>"), quad.StringToValue(pathRoute))
+					pathList, err := p.Iterate(nil).AllValues(graph.store)
+					Expect(err).To(BeNil())
+					Expect(len(pathList)).To(Equal(1))
+
+					// Check Path content
+					readPath, err := graph.readPath(pathID1)
+					Expect(err).To(BeNil())
+					Expect(readPath.Route).To(Equal(path.Route))
+					Expect(readPath.Type).To(Equal(path.Type))
 				})
 			})
 			Context("When the Path does not already exist", func() {
 				It("Then a new Path should be inserted and id returned", func() {
+					// Path to save
+					pathRoute := "/unique/path"
+					pathType := "mqtt-unique"
+					path := &pb.Path{
+						Route: pathRoute,
+						Type:  pathType,
+					}
 
+					// Ensure path doesn't exist
+					p := cayley.StartPath(graph.store, quad.StringToValue(pathType)).In(quad.StringToValue("<type>")).Has(quad.StringToValue("<route>"), quad.StringToValue(pathRoute))
+					pathList, err := p.Iterate(nil).AllValues(graph.store)
+					Expect(err).To(BeNil())
+					Expect(len(pathList)).To(Equal(0))
+
+					// Insert Path
+					pathID, err := graph.SavePath(path)
+
+					// Check Path was added
+					p = cayley.StartPath(graph.store, quad.StringToValue(pathType)).In(quad.StringToValue("<type>")).Has(quad.StringToValue("<route>"), quad.StringToValue(pathRoute))
+					pathList, err = p.Iterate(nil).AllValues(graph.store)
+					Expect(err).To(BeNil())
+					Expect(len(pathList)).To(Equal(1))
+
+					// Check Path content
+					readPath, err := graph.readPath(pathID)
+					Expect(err).To(BeNil())
+					Expect(readPath.Route).To(Equal(path.Route))
+					Expect(readPath.Type).To(Equal(path.Type))
 				})
 			})
 		})
