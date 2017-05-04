@@ -74,11 +74,11 @@ func (gs *GraphStorage) AddFlow(flow *pb.Flow) (string, error) {
 	pathUUID, err := gs.SavePath(flow.Path)
 	flowUUID := fmt.Sprintf("flow:%s", uuid.NewRandom().String())
 	flowDTO := flowDTO{
-		ID:          toQuadIRI(flowUUID),
+		ID:          stringToQuadIRI(flowUUID),
 		Name:        flow.Name,
 		Description: flow.Description,
 		Path: &pathDTO{
-			ID:    toQuadIRI(pathUUID),
+			ID:    stringToQuadIRI(pathUUID),
 			Route: flow.Path.Route,
 			Type:  flow.Path.Type,
 		},
@@ -93,7 +93,7 @@ func (gs *GraphStorage) AddFlow(flow *pb.Flow) (string, error) {
 // ReadFlow returns a Flow of the sepcified uuid from the graph
 func (gs *GraphStorage) ReadFlow(uuid string) (*pb.Flow, error) {
 	var flowDTO flowDTO
-	err := schema.LoadTo(nil, gs.store, &flowDTO, toQuadIRI(uuid))
+	err := schema.LoadTo(nil, gs.store, &flowDTO, stringToQuadIRI(uuid))
 	if err != nil {
 		return nil, err
 	}
@@ -116,13 +116,13 @@ func (gs *GraphStorage) SavePath(path *pb.Path) (string, error) {
 		return "", err
 	}
 	if len(pathList) == 1 {
-		return quadToID(pathList[0]), nil
+		return quadToString(pathList[0]), nil
 	}
 
 	// Insert new Path
 	pathID := fmt.Sprintf("path:%s", uuid.NewRandom().String())
 	pathDTO := pathDTO{
-		ID:    toQuadIRI(pathID),
+		ID:    stringToQuadIRI(pathID),
 		Route: path.Route,
 		Type:  path.Type,
 	}
@@ -136,7 +136,7 @@ func (gs *GraphStorage) SavePath(path *pb.Path) (string, error) {
 // readPath returns Path based on uuid. Used only internally
 func (gs *GraphStorage) readPath(uuid string) (*pb.Path, error) {
 	var pathDTO pathDTO
-	err := schema.LoadTo(nil, gs.store, &pathDTO, toQuadIRI(uuid))
+	err := schema.LoadTo(nil, gs.store, &pathDTO, stringToQuadIRI(uuid))
 	if err != nil {
 		return nil, err
 	}
@@ -146,11 +146,11 @@ func (gs *GraphStorage) readPath(uuid string) (*pb.Path, error) {
 	}, nil
 }
 
-func toQuadIRI(uuid string) quad.IRI {
-	return quad.IRI(uuid).Full().Short()
+func stringToQuadIRI(uuid string) quad.IRI {
+	return quad.IRI(uuid).Short()
 }
 
-func quadToID(quadValue quad.Value) string {
+func quadToString(quadValue quad.Value) string {
 	return strings.TrimFunc(quadValue.String(), func(r rune) bool {
 		switch r {
 		case '>':
