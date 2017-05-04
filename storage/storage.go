@@ -3,6 +3,7 @@ package storage
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/cayleygraph/cayley"
 	"github.com/cayleygraph/cayley/graph"
@@ -108,14 +109,24 @@ func (gs *GraphStorage) ReadFlow(uuid string) (*pb.Flow, error) {
 
 // SavePath adds path to graph if new, else it will return the id of the existing path. Path are unique based on route and type combined
 func (gs *GraphStorage) SavePath(path *pb.Path) (string, error) {
-	// TODO find path by route and type and return id ... not found... do the following
+	// Find if Path already exist. If so, return the Path's id
+	p := cayley.StartPath(gs.store, quad.StringToValue(path.Type)).In(quad.StringToValue("<type>")).Has(quad.StringToValue("<route>"), quad.StringToValue(path.Route))
+	pathList, err := p.Iterate(nil).Limit(1).AllValues(gs.store)
+	if err != nil {
+		return "", err
+	}
+	if len(pathList) == 1 {
+		return quadToID(pathList[0]), nil
+	}
+
+	// Insert new Path
 	pathID := fmt.Sprintf("path:%s", uuid.NewRandom().String())
 	pathDTO := pathDTO{
 		ID:    toQuadIRI(pathID),
 		Route: path.Route,
 		Type:  path.Type,
 	}
-	_, err := schema.WriteAsQuads(gs.qw, pathDTO)
+	_, err = schema.WriteAsQuads(gs.qw, pathDTO)
 	if err != nil {
 		return "", err
 	}
@@ -137,6 +148,19 @@ func (gs *GraphStorage) readPath(uuid string) (*pb.Path, error) {
 
 func toQuadIRI(uuid string) quad.IRI {
 	return quad.IRI(uuid).Full().Short()
+}
+
+func quadToID(quadValue quad.Value) string {
+	return strings.TrimFunc(quadValue.String(), func(r rune) bool {
+		switch r {
+		case '>':
+			return true
+		case '<':
+			return true
+		default:
+			return false
+		}
+	})
 }
 
 func initDatabase(connectionPath string, databaseName string, opts graph.Options) error {
