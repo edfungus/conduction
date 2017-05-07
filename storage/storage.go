@@ -11,14 +11,16 @@ import (
 	"github.com/cayleygraph/cayley/quad"
 	"github.com/cayleygraph/cayley/schema"
 	"github.com/edfungus/conduction/pb"
-	"github.com/pborman/uuid"
+	"github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 )
 
 type Storage interface {
 	AddFlow(flow *pb.Flow) (uuid.UUID, error)
 	ReadFlow(uuid uuid.UUID) (*pb.Flow, error)
-	SavePath(path *pb.Path) error
+	AddPath(path *pb.Path) (uuid.UUID, error)
+	ReadPath(uuid uuid.UUID) (*pb.Path, error)
+	AddFlowToPath(pathUUID uuid.UUID, flowUUID uuid.UUID) error
 }
 
 const (
@@ -45,13 +47,14 @@ type flowDTO struct {
 	ID          quad.IRI `quad:"@id"`
 	Name        string   `quad:"name"`
 	Description string   `quad:"description"`
-	Path        *pathDTO `quad:"path"`
+	Path        quad.IRI `quad:"path"`
 }
 
 type pathDTO struct {
 	ID    quad.IRI `quad:"@id"`
 	Route string   `quad:"route"`
 	Type  string   `quad:"type"`
+	// Flow  []quad.IRI `quad:"triggers"`  // postgres issue: https://github.com/cayleygraph/cayley/issues/563
 }
 
 // NewGraphStorage returns a new Storage that uses Cayley and CockroachDB
@@ -70,30 +73,34 @@ func NewGraphStorage(config *GraphStorageConfig) (*GraphStorage, error) {
 }
 
 // AddFlow adds a new Flow to the graph. If the Path does not exist, it will be added, else it will be made
-func (gs *GraphStorage) AddFlow(flow *pb.Flow) (string, error) {
-	pathUUID, err := gs.SavePath(flow.Path)
-	flowUUID := fmt.Sprintf("flow:%s", uuid.NewRandom().String())
+func (gs *GraphStorage) AddFlow(flow *pb.Flow) (uuid.UUID, error) {
+	pathUUID, err := gs.AddPath(flow.Path)
+	flowUUID := uuid.NewV4()
 	flowDTO := flowDTO{
-		ID:          stringToQuadIRI(flowUUID),
+		ID:          uuidToQuadIRI(flowUUID),
 		Name:        flow.Name,
 		Description: flow.Description,
-		Path: &pathDTO{
-			ID:    stringToQuadIRI(pathUUID),
-			Route: flow.Path.Route,
-			Type:  flow.Path.Type,
-		},
+		Path:        uuidToQuadIRI(pathUUID),
 	}
 	_, err = schema.WriteAsQuads(gs.qw, flowDTO)
 	if err != nil {
-		return "", err
+		return uuid.Nil, err
 	}
 	return flowUUID, nil
 }
 
 // ReadFlow returns a Flow of the sepcified uuid from the graph
-func (gs *GraphStorage) ReadFlow(uuid string) (*pb.Flow, error) {
+func (gs *GraphStorage) ReadFlow(uuid uuid.UUID) (*pb.Flow, error) {
 	var flowDTO flowDTO
-	err := schema.LoadTo(nil, gs.store, &flowDTO, stringToQuadIRI(uuid))
+	err := schema.LoadTo(nil, gs.store, &flowDTO, uuidToQuadIRI(uuid))
+	if err != nil {
+		return nil, err
+	}
+	pathUUID, err := quadIRIToUUID(flowDTO.Path)
+	if err != nil {
+		return nil, err
+	}
+	path, err := gs.ReadPath(pathUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -101,42 +108,46 @@ func (gs *GraphStorage) ReadFlow(uuid string) (*pb.Flow, error) {
 		Name:        flowDTO.Name,
 		Description: flowDTO.Description,
 		Path: &pb.Path{
-			Route: flowDTO.Path.Route,
-			Type:  flowDTO.Path.Type,
+			Route: path.Route,
+			Type:  path.Type,
 		},
 	}, nil
 }
 
-// SavePath adds path to graph if new, else it will return the id of the existing path. Path are unique based on route and type combined
-func (gs *GraphStorage) SavePath(path *pb.Path) (string, error) {
+// AddPath adds path to graph if new, else it will return the id of the existing path. Path are unique based on route and type combined
+func (gs *GraphStorage) AddPath(path *pb.Path) (uuid.UUID, error) {
 	// Find if Path already exist. If so, return the Path's id
 	p := cayley.StartPath(gs.store, quad.StringToValue(path.Type)).In(quad.StringToValue("<type>")).Has(quad.StringToValue("<route>"), quad.StringToValue(path.Route))
 	pathList, err := p.Iterate(nil).Limit(1).AllValues(gs.store)
 	if err != nil {
-		return "", err
+		return uuid.Nil, err
 	}
 	if len(pathList) == 1 {
-		return quadToString(pathList[0]), nil
+		pathUUID, err := quadValueToUUID(pathList[0])
+		if err != nil {
+			return uuid.Nil, err
+		}
+		return pathUUID, nil
 	}
-
 	// Insert new Path
-	pathID := fmt.Sprintf("path:%s", uuid.NewRandom().String())
+	pathID := uuid.NewV4()
 	pathDTO := pathDTO{
-		ID:    stringToQuadIRI(pathID),
+		ID:    uuidToQuadIRI(pathID),
 		Route: path.Route,
 		Type:  path.Type,
+		// Flow:  []quad.IRI{},
 	}
 	_, err = schema.WriteAsQuads(gs.qw, pathDTO)
 	if err != nil {
-		return "", err
+		return uuid.Nil, err
 	}
 	return pathID, nil
 }
 
-// readPath returns Path based on uuid. Used only internally
-func (gs *GraphStorage) readPath(uuid string) (*pb.Path, error) {
+// ReadPath returns Path based on uuid.
+func (gs *GraphStorage) ReadPath(uuid uuid.UUID) (*pb.Path, error) {
 	var pathDTO pathDTO
-	err := schema.LoadTo(nil, gs.store, &pathDTO, stringToQuadIRI(uuid))
+	err := schema.LoadTo(nil, gs.store, &pathDTO, uuidToQuadIRI(uuid))
 	if err != nil {
 		return nil, err
 	}
@@ -146,12 +157,20 @@ func (gs *GraphStorage) readPath(uuid string) (*pb.Path, error) {
 	}, nil
 }
 
-func stringToQuadIRI(uuid string) quad.IRI {
-	return quad.IRI(uuid).Short()
+func uuidToQuadIRI(uuid uuid.UUID) quad.IRI {
+	return quad.IRI(uuid.String()).Short()
 }
 
-func quadToString(quadValue quad.Value) string {
-	return strings.TrimFunc(quadValue.String(), func(r rune) bool {
+func quadValueToUUID(quadValue quad.Value) (uuid.UUID, error) {
+	return uuid.FromString(removeIDBrackets(quadValue.String()))
+}
+
+func quadIRIToUUID(quadIRI quad.IRI) (uuid.UUID, error) {
+	return uuid.FromString(removeIDBrackets(quadIRI.String()))
+}
+
+func removeIDBrackets(s string) string {
+	return strings.TrimFunc(s, func(r rune) bool {
 		switch r {
 		case '>':
 			return true

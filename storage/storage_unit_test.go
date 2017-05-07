@@ -3,12 +3,10 @@
 package storage
 
 import (
-	"fmt"
-
 	"github.com/cayleygraph/cayley/quad"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/pborman/uuid"
+	"github.com/satori/go.uuid"
 )
 
 var _ = Describe("Conduction", func() {
@@ -16,9 +14,9 @@ var _ = Describe("Conduction", func() {
 		Describe("Given a string", func() {
 			Context("When an id needs to be generated for the graph", func() {
 				It("Then a quad.IRI object should be created with the ID", func() {
-					id := fmt.Sprintf("id:%s", uuid.NewRandom().String())
-					quad := quad.IRI(id)
-					generatedQuad := stringToQuadIRI(id)
+					uuid := uuid.NewV4()
+					quad := quad.IRI(uuid.String())
+					generatedQuad := uuidToQuadIRI(uuid)
 					Expect(generatedQuad).To(Equal(quad))
 				})
 			})
@@ -26,13 +24,16 @@ var _ = Describe("Conduction", func() {
 		Describe("Given a quad.Value", func() {
 			Context("When an id is needed from a quad.Value", func() {
 				It("Then the id should be retrieved without < or > around the id", func() {
-					id1 := quad.StringToValue("<test>")
-					id2 := quad.StringToValue("<te<>st>")
-					id3 := quad.StringToValue("test")
+					uuid := uuid.NewV4()
+					id1 := quad.StringToValue("<" + uuid.String() + ">")
+					id3 := quad.StringToValue(uuid.String())
 
-					Expect(quadToString(id1)).To(Equal("test"))
-					Expect(quadToString(id2)).To(Equal("te<>st"))
-					Expect(quadToString(id3)).To(Equal(`"test"`))
+					uuid1, err := quadValueToUUID(id1)
+					Expect(err).To(BeNil())
+					Expect(uuid1).To(Equal(uuid))
+
+					_, err = quadValueToUUID(id3)
+					Expect(err).ToNot(BeNil()) // cayley adds "" around the id which is invalid
 				})
 			})
 		})

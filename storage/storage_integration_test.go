@@ -1,4 +1,4 @@
-// +build all integration
+// +build all integration work
 
 package storage
 
@@ -6,6 +6,7 @@ import (
 	"github.com/cayleygraph/cayley"
 	"github.com/cayleygraph/cayley/quad"
 	"github.com/edfungus/conduction/pb"
+	uuid "github.com/satori/go.uuid"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -64,7 +65,7 @@ var _ = Describe("Conduction", func() {
 					}
 					id, err := graph.AddFlow(flow)
 					Expect(err).To(BeNil())
-					Expect(id).ToNot(BeNil())
+					Expect(id).ToNot(Equal(uuid.Nil))
 
 					newFlow, err := graph.ReadFlow(id)
 					Expect(err).To(BeNil())
@@ -83,9 +84,9 @@ var _ = Describe("Conduction", func() {
 						Route: pathRoute,
 						Type:  pathType,
 					}
-					pathID, err := graph.SavePath(path)
+					pathID, err := graph.AddPath(path)
 					Expect(err).To(BeNil())
-					Expect(pathID).ToNot(BeNil())
+					Expect(pathID).ToNot(Equal(uuid.Nil))
 
 					// Save flow with same path route and type
 					flow := &pb.Flow{
@@ -98,7 +99,7 @@ var _ = Describe("Conduction", func() {
 					}
 					flowID, err := graph.AddFlow(flow)
 					Expect(err).To(BeNil())
-					Expect(flowID).ToNot(BeNil())
+					Expect(flowID).ToNot(Equal(uuid.Nil))
 
 					// Make sure Path was not recreated
 					p := cayley.StartPath(graph.store, quad.StringToValue(pathType)).In(quad.StringToValue("<type>")).Has(quad.StringToValue("<route>"), quad.StringToValue(pathRoute))
@@ -128,8 +129,8 @@ var _ = Describe("Conduction", func() {
 					}
 
 					// Insert Path twice
-					pathID1, err := graph.SavePath(path)
-					pathID2, err := graph.SavePath(path)
+					pathID1, err := graph.AddPath(path)
+					pathID2, err := graph.AddPath(path)
 					Expect(pathID1).To(Equal(pathID2))
 
 					// Check Path was added only once
@@ -139,7 +140,7 @@ var _ = Describe("Conduction", func() {
 					Expect(len(pathList)).To(Equal(1))
 
 					// Check Path content
-					readPath, err := graph.readPath(pathID1)
+					readPath, err := graph.ReadPath(pathID1)
 					Expect(err).To(BeNil())
 					Expect(readPath.Route).To(Equal(path.Route))
 					Expect(readPath.Type).To(Equal(path.Type))
@@ -162,7 +163,7 @@ var _ = Describe("Conduction", func() {
 					Expect(len(pathList)).To(Equal(0))
 
 					// Insert Path
-					pathID, err := graph.SavePath(path)
+					pathID, err := graph.AddPath(path)
 
 					// Check Path was added
 					p = cayley.StartPath(graph.store, quad.StringToValue(pathType)).In(quad.StringToValue("<type>")).Has(quad.StringToValue("<route>"), quad.StringToValue(pathRoute))
@@ -171,7 +172,7 @@ var _ = Describe("Conduction", func() {
 					Expect(len(pathList)).To(Equal(1))
 
 					// Check Path content
-					readPath, err := graph.readPath(pathID)
+					readPath, err := graph.ReadPath(pathID)
 					Expect(err).To(BeNil())
 					Expect(readPath.Route).To(Equal(path.Route))
 					Expect(readPath.Type).To(Equal(path.Type))
