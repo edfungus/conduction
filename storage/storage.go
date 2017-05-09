@@ -32,7 +32,6 @@ var Logger = logrus.New()
 
 type GraphStorage struct {
 	store *cayley.Handle
-	qw    graph.BatchWriter
 }
 
 type GraphStorageConfig struct {
@@ -68,7 +67,6 @@ func NewGraphStorage(config *GraphStorageConfig) (*GraphStorage, error) {
 	}
 	return &GraphStorage{
 		store: store,
-		qw:    graph.NewWriter(store),
 	}, nil
 }
 
@@ -82,7 +80,7 @@ func (gs *GraphStorage) AddFlow(flow *pb.Flow) (uuid.UUID, error) {
 		Description: flow.Description,
 		Path:        uuidToQuadIRI(pathUUID),
 	}
-	_, err = schema.WriteAsQuads(gs.qw, flowDTO)
+	gs.writeToGraph(flowDTO)
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -137,7 +135,7 @@ func (gs *GraphStorage) AddPath(path *pb.Path) (uuid.UUID, error) {
 		Type:  path.Type,
 		// Flow:  []quad.IRI{},
 	}
-	_, err = schema.WriteAsQuads(gs.qw, pathDTO)
+	gs.writeToGraph(pathDTO)
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -180,6 +178,19 @@ func removeIDBrackets(s string) string {
 			return false
 		}
 	})
+}
+
+func (gs *GraphStorage) writeToGraph(dto interface{}) error {
+	writer := graph.NewWriter(gs.store)
+	_, err := schema.WriteAsQuads(writer, dto)
+	if err != nil {
+		return err
+	}
+	writer.Close()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func initDatabase(connectionPath string, databaseName string, opts graph.Options) error {
