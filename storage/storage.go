@@ -3,11 +3,16 @@ package storage
 import (
 	"database/sql"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"strings"
+
+	"os"
 
 	"github.com/cayleygraph/cayley"
 	"github.com/cayleygraph/cayley/graph"
-	_ "github.com/cayleygraph/cayley/graph/sql" // Need for Cayley to connect o database
+	_ "github.com/cayleygraph/cayley/graph/bolt"
+	_ "github.com/cayleygraph/cayley/graph/sql" // Need for Cayley to connect to database
 	"github.com/cayleygraph/cayley/quad"
 	"github.com/cayleygraph/cayley/schema"
 	"github.com/edfungus/conduction/pb"
@@ -31,7 +36,8 @@ const (
 var Logger = logrus.New()
 
 type GraphStorage struct {
-	store *cayley.Handle
+	store   *cayley.Handle
+	tmpFile *os.File
 }
 
 type GraphStorageConfig struct {
@@ -50,14 +56,15 @@ type flowDTO struct {
 }
 
 type pathDTO struct {
-	ID    quad.IRI `quad:"@id"`
-	Route string   `quad:"route"`
-	Type  string   `quad:"type"`
-	// Flow  []quad.IRI `quad:"triggers"`  // postgres issue: https://github.com/cayleygraph/cayley/issues/563
+	ID    quad.IRI   `quad:"@id"`
+	Route string     `quad:"route"`
+	Type  string     `quad:"type"`
+	Flow  []quad.IRI `quad:"triggers,optional"`
 }
 
 // NewGraphStorage returns a new Storage that uses Cayley and CockroachDB
 func NewGraphStorage(config *GraphStorageConfig) (*GraphStorage, error) {
+	return NewGraphStorageBolt() // overriding sql for now
 	databasePath := fmt.Sprintf(DATABASE_URL, config.User, config.Host, config.Port, config.DatabaseName)
 	opts := graph.Options{"flavor": config.DatabaseType}
 	initDatabase(databasePath, config.DatabaseName, opts)
@@ -70,6 +77,30 @@ func NewGraphStorage(config *GraphStorageConfig) (*GraphStorage, error) {
 	}, nil
 }
 
+// NewGraphStorageBolt allows graph to be stored in a file instead sql above. This is to dodge the issue with inserting a struct of optional or empty array in to the graph (postgres issue: https://github.com/cayleygraph/cayley/issues/563)
+func NewGraphStorageBolt() (*GraphStorage, error) {
+	tmpfile, err := ioutil.TempFile("", "example")
+	if err != nil {
+		log.Fatal(err)
+	}
+	graph.InitQuadStore("bolt", tmpfile.Name(), nil)
+	store, err := cayley.NewGraph("bolt", tmpfile.Name(), nil)
+	if err != nil {
+		return nil, err
+	}
+	return &GraphStorage{
+		store:   store,
+		tmpFile: tmpfile,
+	}, nil
+}
+
+// Close ends graph database session. Currently, it will delete temporary database file if used
+func (gs *GraphStorage) Close() {
+	if gs.tmpFile != nil {
+		os.Remove(gs.tmpFile.Name())
+	}
+}
+
 // AddFlow adds a new Flow to the graph. If the Path does not exist, it will be added, else it will be made
 func (gs *GraphStorage) AddFlow(flow *pb.Flow) (uuid.UUID, error) {
 	pathUUID, err := gs.AddPath(flow.Path)
@@ -80,7 +111,7 @@ func (gs *GraphStorage) AddFlow(flow *pb.Flow) (uuid.UUID, error) {
 		Description: flow.Description,
 		Path:        uuidToQuadIRI(pathUUID),
 	}
-	gs.writeToGraph(flowDTO)
+	err = gs.writeToGraph(flowDTO)
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -133,9 +164,8 @@ func (gs *GraphStorage) AddPath(path *pb.Path) (uuid.UUID, error) {
 		ID:    uuidToQuadIRI(pathID),
 		Route: path.Route,
 		Type:  path.Type,
-		// Flow:  []quad.IRI{},
 	}
-	gs.writeToGraph(pathDTO)
+	err = gs.writeToGraph(pathDTO)
 	if err != nil {
 		return uuid.Nil, err
 	}
