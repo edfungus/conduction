@@ -2,6 +2,7 @@ package storage
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -79,7 +80,7 @@ func NewGraphStorage(config *GraphStorageConfig) (*GraphStorage, error) {
 
 // NewGraphStorageBolt allows graph to be stored in a file instead sql above. This is to dodge the issue with inserting a struct of optional or empty array in to the graph (postgres issue: https://github.com/cayleygraph/cayley/issues/563)
 func NewGraphStorageBolt() (*GraphStorage, error) {
-	tmpfile, err := ioutil.TempFile("", "example")
+	tmpfile, err := ioutil.TempFile("./", "example")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -146,7 +147,7 @@ func (gs *GraphStorage) ReadFlow(uuid uuid.UUID) (*pb.Flow, error) {
 // AddPath adds path to graph if new, else it will return the id of the existing path. Path are unique based on route and type combined
 func (gs *GraphStorage) AddPath(path *pb.Path) (uuid.UUID, error) {
 	// Find if Path already exist. If so, return the Path's id
-	p := cayley.StartPath(gs.store, quad.StringToValue(path.Type)).In(quad.StringToValue("<type>")).Has(quad.StringToValue("<route>"), quad.StringToValue(path.Route))
+	p := cayley.StartPath(gs.store, quad.StringToValue(path.Type)).In(quad.IRI("type")).Has(quad.IRI("route"), quad.StringToValue(path.Route))
 	pathList, err := p.Iterate(nil).Limit(1).AllValues(gs.store)
 	if err != nil {
 		return uuid.Nil, err
@@ -185,8 +186,35 @@ func (gs *GraphStorage) ReadPath(uuid uuid.UUID) (*pb.Path, error) {
 	}, nil
 }
 
+// AddFlowToPath connects Flows to be triggered by a Path
+func (gs *GraphStorage) AddFlowToPath(pathUUID uuid.UUID, flowUUID uuid.UUID) error {
+	pathCheck, err := gs.uuidExists(pathUUID)
+	switch {
+	case err != nil:
+		return err
+	case pathCheck == false:
+		return errors.New("Path UUID does no exist in graph")
+	}
+	flowCheck, err := gs.uuidExists(flowUUID)
+	switch {
+	case err != nil:
+		return err
+	case flowCheck == false:
+		return errors.New("Flow UUID does no exist in graph")
+	}
+	err = gs.store.AddQuad(quad.Make(uuidToQuadValue(pathUUID), quad.IRI("triggers"), uuidToQuadValue(flowUUID), nil))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func uuidToQuadIRI(uuid uuid.UUID) quad.IRI {
 	return quad.IRI(uuid.String()).Short()
+}
+
+func uuidToQuadValue(uuid uuid.UUID) quad.Value {
+	return quad.StringToValue("<" + uuid.String() + ">")
 }
 
 func quadValueToUUID(quadValue quad.Value) (uuid.UUID, error) {
@@ -210,13 +238,25 @@ func removeIDBrackets(s string) string {
 	})
 }
 
+func (gs *GraphStorage) uuidExists(uuid uuid.UUID) (bool, error) {
+	v, err := cayley.StartPath(gs.store, uuidToQuadValue(uuid)).Iterate(nil).AllValues(gs.store)
+	switch {
+	case err != nil:
+		return false, err
+	case len(v) >= 1:
+		return true, nil
+	default:
+		return false, nil
+	}
+}
+
 func (gs *GraphStorage) writeToGraph(dto interface{}) error {
 	writer := graph.NewWriter(gs.store)
 	_, err := schema.WriteAsQuads(writer, dto)
 	if err != nil {
 		return err
 	}
-	writer.Close()
+	err = writer.Close()
 	if err != nil {
 		return err
 	}

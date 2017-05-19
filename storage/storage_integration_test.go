@@ -183,5 +183,130 @@ var _ = Describe("Conduction", func() {
 				})
 			})
 		})
+		Describe("Given a Flow id and Path id (which will trigger the Flow)", func() {
+			Context("When the ids are given are valid", func() {
+				It("Then the Path will be connected to the Flow", func() {
+					// Save Path
+					pathTriggerRoute := "/test"
+					pathTriggerType := "path-trigger"
+					pathTrigger := &pb.Path{
+						Route: pathTriggerRoute,
+						Type:  pathTriggerType,
+					}
+					pathTriggerID, err := graph.AddPath(pathTrigger)
+					Expect(err).To(BeNil())
+					Expect(pathTriggerID).ToNot(Equal(uuid.Nil))
+
+					// Save Flow
+					flow := &pb.Flow{
+						Name:        "Flow Name",
+						Description: "Flow Description",
+						Path: &pb.Path{
+							Route: "/some-route",
+							Type:  "mqtt",
+						},
+					}
+					flowID1, err := graph.AddFlow(flow)
+					Expect(err).To(BeNil())
+					Expect(flowID1).ToNot(Equal(uuid.Nil))
+
+					// Connect Flow to Path
+					err = graph.AddFlowToPath(pathTriggerID, flowID1)
+					Expect(err).To(BeNil())
+
+					// Check that Path connects to the Flow with vertex "triggers"
+					p := cayley.StartPath(graph.store, uuidToQuadValue(pathTriggerID)).Out(quad.IRI("triggers"))
+					triggersList, err := p.Iterate(nil).AllValues(graph.store)
+					Expect(err).To(BeNil())
+					Expect(len(triggersList)).To(Equal(1))
+					Expect(quadValueToUUID(triggersList[0])).To(Equal(flowID1))
+				})
+			})
+			Context("When the Path already has a Flow that it triggers", func() {
+				It("Then should add the new Flow so the Path triggers two Flows", func() {
+					// Save Path
+					pathTriggerRoute := "/test"
+					pathTriggerType := "path-trigger"
+					pathTrigger := &pb.Path{
+						Route: pathTriggerRoute,
+						Type:  pathTriggerType,
+					}
+					pathTriggerID, err := graph.AddPath(pathTrigger)
+					Expect(err).To(BeNil())
+					Expect(pathTriggerID).ToNot(Equal(uuid.Nil))
+
+					// Save both Flows
+					flow := &pb.Flow{
+						Name:        "Flow Name",
+						Description: "Flow Description",
+						Path: &pb.Path{
+							Route: "/some-route",
+							Type:  "mqtt",
+						},
+					}
+					flowID1, err := graph.AddFlow(flow)
+					Expect(err).To(BeNil())
+					Expect(flowID1).ToNot(Equal(uuid.Nil))
+					flowID2, err := graph.AddFlow(flow)
+					Expect(err).To(BeNil())
+					Expect(flowID2).ToNot(Equal(uuid.Nil))
+
+					// Connect Flow to Path
+					err = graph.AddFlowToPath(pathTriggerID, flowID1)
+					Expect(err).To(BeNil())
+					err = graph.AddFlowToPath(pathTriggerID, flowID2)
+					Expect(err).To(BeNil())
+
+					// Check that Path connects to both Flow 1 and Flow 2
+					p := cayley.StartPath(graph.store, uuidToQuadValue(pathTriggerID)).Out(quad.IRI("triggers"))
+					triggersList, err := p.Iterate(nil).AllValues(graph.store)
+					Expect(err).To(BeNil())
+					Expect(len(triggersList)).To(Equal(2))
+					for _, v := range triggersList {
+						id, err := quadValueToUUID(v)
+						Expect(err).To(BeNil())
+						switch {
+						case uuid.Equal(id, flowID1):
+						case uuid.Equal(id, flowID2):
+						default:
+							Fail("Unknown Flow uuid connected to Path")
+						}
+					}
+				})
+			})
+			Context("When either id does not exists", func() {
+				It("Then an error will be thrown", func() {
+					// Save Path
+					pathTriggerRoute := "/test"
+					pathTriggerType := "path-trigger"
+					pathTrigger := &pb.Path{
+						Route: pathTriggerRoute,
+						Type:  pathTriggerType,
+					}
+					pathTriggerID, err := graph.AddPath(pathTrigger)
+					Expect(err).To(BeNil())
+					Expect(pathTriggerID).ToNot(Equal(uuid.Nil))
+
+					// Save Flow
+					flow := &pb.Flow{
+						Name:        "Flow Name",
+						Description: "Flow Description",
+						Path: &pb.Path{
+							Route: "/some-route",
+							Type:  "mqtt",
+						},
+					}
+					flowID1, err := graph.AddFlow(flow)
+					Expect(err).To(BeNil())
+					Expect(flowID1).ToNot(Equal(uuid.Nil))
+
+					// Connect bad Flow id or Path id
+					err = graph.AddFlowToPath(pathTriggerID, uuid.NewV4())
+					Expect(err).ToNot(BeNil())
+					err = graph.AddFlowToPath(uuid.NewV4(), flowID1)
+					Expect(err).ToNot(BeNil())
+				})
+			})
+		})
 	})
 })
