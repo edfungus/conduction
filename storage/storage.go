@@ -24,9 +24,12 @@ import (
 type Storage interface {
 	AddFlow(flow *pb.Flow) (uuid.UUID, error)
 	ReadFlow(uuid uuid.UUID) (*pb.Flow, error)
+
 	AddPath(path *pb.Path) (uuid.UUID, error)
 	ReadPath(uuid uuid.UUID) (*pb.Path, error)
+
 	AddFlowToPath(pathUUID uuid.UUID, flowUUID uuid.UUID) error
+	GetFlowsForPath(pathUUID uuid.UUID) ([]pb.Flow, error)
 }
 
 const (
@@ -207,6 +210,28 @@ func (gs *GraphStorage) AddFlowToPath(pathUUID uuid.UUID, flowUUID uuid.UUID) er
 		return err
 	}
 	return nil
+}
+
+// GetFlowsForPath returns a list of Flows that are triggers by the Flow
+func (gs *GraphStorage) GetFlowsForPath(pathUUID uuid.UUID) ([]pb.Flow, error) {
+	p := cayley.StartPath(gs.store, uuidToQuadValue(pathUUID)).Out(quad.IRI("triggers"))
+	flowQValues, err := p.Iterate(nil).AllValues(gs.store)
+	if err != nil {
+		return nil, err
+	}
+	flowList := []pb.Flow{}
+	for _, v := range flowQValues {
+		uuid, err := quadValueToUUID(v)
+		if err != nil {
+			return nil, err
+		}
+		flow, err := gs.ReadFlow(uuid)
+		if err != nil {
+			return nil, err
+		}
+		flowList = append(flowList, *flow)
+	}
+	return flowList, nil
 }
 
 func uuidToQuadIRI(uuid uuid.UUID) quad.IRI {

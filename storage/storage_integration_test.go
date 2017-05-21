@@ -308,5 +308,50 @@ var _ = Describe("Conduction", func() {
 				})
 			})
 		})
+		Describe("Given a Path triggers Flows", func() {
+			Context("When a Path UUID is given", func() {
+				It("Then a list of Flows should be returned", func() {
+					// Save Path
+					pathTriggerRoute := "/test"
+					pathTriggerType := "path-trigger"
+					pathTrigger := &pb.Path{
+						Route: pathTriggerRoute,
+						Type:  pathTriggerType,
+					}
+					pathTriggerID, err := graph.AddPath(pathTrigger)
+					Expect(err).To(BeNil())
+					Expect(pathTriggerID).ToNot(Equal(uuid.Nil))
+
+					// Save both Flows
+					flow := &pb.Flow{
+						Name:        "Flow Name",
+						Description: "Flow Description",
+						Path: &pb.Path{
+							Route: "/some-route",
+							Type:  "mqtt",
+						},
+					}
+					flowID1, err := graph.AddFlow(flow)
+					Expect(err).To(BeNil())
+					Expect(flowID1).ToNot(Equal(uuid.Nil))
+					flowID2, err := graph.AddFlow(flow)
+					Expect(err).To(BeNil())
+					Expect(flowID2).ToNot(Equal(uuid.Nil))
+
+					// Connect Flow to Path
+					err = graph.AddFlowToPath(pathTriggerID, flowID1)
+					Expect(err).To(BeNil())
+					err = graph.AddFlowToPath(pathTriggerID, flowID2)
+					Expect(err).To(BeNil())
+
+					// Get Flows
+					flows, err := graph.GetFlowsForPath(pathTriggerID)
+					Expect(err).To(BeNil())
+					Expect(len(flows)).To(Equal(2))
+					Expect(flows[0]).To(Equal(*flow))
+					Expect(flows[1]).To(Equal(*flow))
+				})
+			})
+		})
 	})
 })
