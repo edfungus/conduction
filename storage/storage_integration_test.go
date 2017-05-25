@@ -67,11 +67,11 @@ var _ = Describe("Conduction", func() {
 							Type:  "mqtt-duplicate",
 						},
 					}
-					id, err := graph.AddFlow(flow)
+					key, err := graph.AddFlow(flow)
 					Expect(err).To(BeNil())
-					Expect(id).ToNot(Equal(uuid.Nil))
+					Expect(key).ToNot(Equal(Key{}))
 
-					newFlow, err := graph.ReadFlow(id)
+					newFlow, err := graph.ReadFlow(key)
 					Expect(err).To(BeNil())
 					Expect(newFlow.Name).To(Equal(flow.Name))
 					Expect(newFlow.Description).To(Equal(flow.Description))
@@ -88,9 +88,9 @@ var _ = Describe("Conduction", func() {
 						Route: pathRoute,
 						Type:  pathType,
 					}
-					pathID, err := graph.AddPath(path)
+					pathKey, err := graph.AddPath(path)
 					Expect(err).To(BeNil())
-					Expect(pathID).ToNot(Equal(uuid.Nil))
+					Expect(pathKey).ToNot(Equal(Key{}))
 
 					// Save flow with same path route and type
 					flow := &pb.Flow{
@@ -101,9 +101,9 @@ var _ = Describe("Conduction", func() {
 							Type:  path.Type,
 						},
 					}
-					flowID, err := graph.AddFlow(flow)
+					flowKey, err := graph.AddFlow(flow)
 					Expect(err).To(BeNil())
-					Expect(flowID).ToNot(Equal(uuid.Nil))
+					Expect(flowKey).ToNot(Equal(Key{}))
 
 					// Make sure Path was not recreated
 					p := cayley.StartPath(graph.store, quad.StringToValue(pathType)).In(quad.StringToValue("<type>")).Has(quad.StringToValue("<route>"), quad.StringToValue(pathRoute))
@@ -112,7 +112,7 @@ var _ = Describe("Conduction", func() {
 					Expect(len(pathList)).To(Equal(1))
 
 					// Check that Flow was correctly saved
-					newFlow, err := graph.ReadFlow(flowID)
+					newFlow, err := graph.ReadFlow(flowKey)
 					Expect(err).To(BeNil())
 					Expect(newFlow.Name).To(Equal(flow.Name))
 					Expect(newFlow.Description).To(Equal(flow.Description))
@@ -133,9 +133,11 @@ var _ = Describe("Conduction", func() {
 					}
 
 					// Insert Path twice
-					pathID1, err := graph.AddPath(path)
-					pathID2, err := graph.AddPath(path)
-					Expect(pathID1).To(Equal(pathID2))
+					pathKey1, err := graph.AddPath(path)
+					Expect(err).To(BeNil())
+					pathKey2, err := graph.AddPath(path)
+					Expect(err).To(BeNil())
+					Expect(pathKey1).To(Equal(pathKey2))
 
 					// Check Path was added only once
 					p := cayley.StartPath(graph.store, quad.StringToValue(pathType)).In(quad.StringToValue("<type>")).Has(quad.StringToValue("<route>"), quad.StringToValue(pathRoute))
@@ -144,7 +146,7 @@ var _ = Describe("Conduction", func() {
 					Expect(len(pathList)).To(Equal(1))
 
 					// Check Path content
-					readPath, err := graph.ReadPath(pathID1)
+					readPath, err := graph.ReadPath(pathKey1)
 					Expect(err).To(BeNil())
 					Expect(readPath.Route).To(Equal(path.Route))
 					Expect(readPath.Type).To(Equal(path.Type))
@@ -167,7 +169,7 @@ var _ = Describe("Conduction", func() {
 					Expect(len(pathList)).To(Equal(0))
 
 					// Insert Path
-					pathID, err := graph.AddPath(path)
+					pathKey, err := graph.AddPath(path)
 
 					// Check Path was added
 					p = cayley.StartPath(graph.store, quad.StringToValue(pathType)).In(quad.StringToValue("<type>")).Has(quad.StringToValue("<route>"), quad.StringToValue(pathRoute))
@@ -176,7 +178,7 @@ var _ = Describe("Conduction", func() {
 					Expect(len(pathList)).To(Equal(1))
 
 					// Check Path content
-					readPath, err := graph.ReadPath(pathID)
+					readPath, err := graph.ReadPath(pathKey)
 					Expect(err).To(BeNil())
 					Expect(readPath.Route).To(Equal(path.Route))
 					Expect(readPath.Type).To(Equal(path.Type))
@@ -193,9 +195,9 @@ var _ = Describe("Conduction", func() {
 						Route: pathTriggerRoute,
 						Type:  pathTriggerType,
 					}
-					pathTriggerID, err := graph.AddPath(pathTrigger)
+					pathTriggerKey, err := graph.AddPath(pathTrigger)
 					Expect(err).To(BeNil())
-					Expect(pathTriggerID).ToNot(Equal(uuid.Nil))
+					Expect(pathTriggerKey).ToNot(Equal(Key{}))
 
 					// Save Flow
 					flow := &pb.Flow{
@@ -206,20 +208,20 @@ var _ = Describe("Conduction", func() {
 							Type:  "mqtt",
 						},
 					}
-					flowID1, err := graph.AddFlow(flow)
+					flowKey, err := graph.AddFlow(flow)
 					Expect(err).To(BeNil())
-					Expect(flowID1).ToNot(Equal(uuid.Nil))
+					Expect(flowKey).ToNot(Equal(Key{}))
 
 					// Connect Flow to Path
-					err = graph.AddFlowToPath(pathTriggerID, flowID1)
+					err = graph.AddFlowToPath(pathTriggerKey, flowKey)
 					Expect(err).To(BeNil())
 
 					// Check that Path connects to the Flow with vertex "triggers"
-					p := cayley.StartPath(graph.store, uuidToQuadValue(pathTriggerID)).Out(quad.IRI("triggers"))
+					p := cayley.StartPath(graph.store, pathTriggerKey.QuadValue()).Out(quad.IRI("triggers"))
 					triggersList, err := p.Iterate(nil).AllValues(graph.store)
 					Expect(err).To(BeNil())
 					Expect(len(triggersList)).To(Equal(1))
-					Expect(quadValueToUUID(triggersList[0])).To(Equal(flowID1))
+					Expect(NewKeyFromQuadValue(triggersList[0])).To(Equal(flowKey))
 				})
 			})
 			Context("When the Path already has a Flow that it triggers", func() {
@@ -231,9 +233,9 @@ var _ = Describe("Conduction", func() {
 						Route: pathTriggerRoute,
 						Type:  pathTriggerType,
 					}
-					pathTriggerID, err := graph.AddPath(pathTrigger)
+					pathTriggerKey, err := graph.AddPath(pathTrigger)
 					Expect(err).To(BeNil())
-					Expect(pathTriggerID).ToNot(Equal(uuid.Nil))
+					Expect(pathTriggerKey).ToNot(Equal(uuid.Nil))
 
 					// Save both Flows
 					flow := &pb.Flow{
@@ -244,30 +246,30 @@ var _ = Describe("Conduction", func() {
 							Type:  "mqtt",
 						},
 					}
-					flowID1, err := graph.AddFlow(flow)
+					flowKey1, err := graph.AddFlow(flow)
 					Expect(err).To(BeNil())
-					Expect(flowID1).ToNot(Equal(uuid.Nil))
-					flowID2, err := graph.AddFlow(flow)
+					Expect(flowKey1).ToNot(Equal(Key{}))
+					flowKey2, err := graph.AddFlow(flow)
 					Expect(err).To(BeNil())
-					Expect(flowID2).ToNot(Equal(uuid.Nil))
+					Expect(flowKey2).ToNot(Equal(Key{}))
 
 					// Connect Flow to Path
-					err = graph.AddFlowToPath(pathTriggerID, flowID1)
+					err = graph.AddFlowToPath(pathTriggerKey, flowKey1)
 					Expect(err).To(BeNil())
-					err = graph.AddFlowToPath(pathTriggerID, flowID2)
+					err = graph.AddFlowToPath(pathTriggerKey, flowKey2)
 					Expect(err).To(BeNil())
 
 					// Check that Path connects to both Flow 1 and Flow 2
-					p := cayley.StartPath(graph.store, uuidToQuadValue(pathTriggerID)).Out(quad.IRI("triggers"))
+					p := cayley.StartPath(graph.store, pathTriggerKey.QuadValue()).Out(quad.IRI("triggers"))
 					triggersList, err := p.Iterate(nil).AllValues(graph.store)
 					Expect(err).To(BeNil())
 					Expect(len(triggersList)).To(Equal(2))
 					for _, v := range triggersList {
-						id, err := quadValueToUUID(v)
+						key, err := NewKeyFromQuadValue(v)
 						Expect(err).To(BeNil())
 						switch {
-						case uuid.Equal(id, flowID1):
-						case uuid.Equal(id, flowID2):
+						case key.Equals(flowKey1):
+						case key.Equals(flowKey2):
 						default:
 							Fail("Unknown Flow uuid connected to Path")
 						}
@@ -283,9 +285,9 @@ var _ = Describe("Conduction", func() {
 						Route: pathTriggerRoute,
 						Type:  pathTriggerType,
 					}
-					pathTriggerID, err := graph.AddPath(pathTrigger)
+					pathTriggerKey, err := graph.AddPath(pathTrigger)
 					Expect(err).To(BeNil())
-					Expect(pathTriggerID).ToNot(Equal(uuid.Nil))
+					Expect(pathTriggerKey).ToNot(Equal(Key{}))
 
 					// Save Flow
 					flow := &pb.Flow{
@@ -296,14 +298,14 @@ var _ = Describe("Conduction", func() {
 							Type:  "mqtt",
 						},
 					}
-					flowID1, err := graph.AddFlow(flow)
+					flowKey, err := graph.AddFlow(flow)
 					Expect(err).To(BeNil())
-					Expect(flowID1).ToNot(Equal(uuid.Nil))
+					Expect(flowKey).ToNot(Equal(Key{}))
 
 					// Connect bad Flow id or Path id
-					err = graph.AddFlowToPath(pathTriggerID, uuid.NewV4())
+					err = graph.AddFlowToPath(pathTriggerKey, NewRandomKey())
 					Expect(err).ToNot(BeNil())
-					err = graph.AddFlowToPath(uuid.NewV4(), flowID1)
+					err = graph.AddFlowToPath(NewRandomKey(), flowKey)
 					Expect(err).ToNot(BeNil())
 				})
 			})
@@ -318,9 +320,9 @@ var _ = Describe("Conduction", func() {
 						Route: pathTriggerRoute,
 						Type:  pathTriggerType,
 					}
-					pathTriggerID, err := graph.AddPath(pathTrigger)
+					pathTriggerKey, err := graph.AddPath(pathTrigger)
 					Expect(err).To(BeNil())
-					Expect(pathTriggerID).ToNot(Equal(uuid.Nil))
+					Expect(pathTriggerKey).ToNot(Equal(Key{}))
 
 					// Save both Flows
 					flow := &pb.Flow{
@@ -331,21 +333,21 @@ var _ = Describe("Conduction", func() {
 							Type:  "mqtt",
 						},
 					}
-					flowID1, err := graph.AddFlow(flow)
+					flowKey1, err := graph.AddFlow(flow)
 					Expect(err).To(BeNil())
-					Expect(flowID1).ToNot(Equal(uuid.Nil))
-					flowID2, err := graph.AddFlow(flow)
+					Expect(flowKey1).ToNot(Equal(Key{}))
+					flowKey2, err := graph.AddFlow(flow)
 					Expect(err).To(BeNil())
-					Expect(flowID2).ToNot(Equal(uuid.Nil))
+					Expect(flowKey2).ToNot(Equal(Key{}))
 
 					// Connect Flow to Path
-					err = graph.AddFlowToPath(pathTriggerID, flowID1)
+					err = graph.AddFlowToPath(pathTriggerKey, flowKey1)
 					Expect(err).To(BeNil())
-					err = graph.AddFlowToPath(pathTriggerID, flowID2)
+					err = graph.AddFlowToPath(pathTriggerKey, flowKey2)
 					Expect(err).To(BeNil())
 
 					// Get Flows
-					flows, err := graph.GetFlowsForPath(pathTriggerID)
+					flows, err := graph.GetFlowsForPath(pathTriggerKey)
 					Expect(err).To(BeNil())
 					Expect(len(flows)).To(Equal(2))
 					Expect(flows[0]).To(Equal(*flow))

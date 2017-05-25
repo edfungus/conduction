@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"strings"
 
 	"os"
 
@@ -17,19 +16,18 @@ import (
 	"github.com/cayleygraph/cayley/quad"
 	"github.com/cayleygraph/cayley/schema"
 	"github.com/edfungus/conduction/pb"
-	"github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 )
 
 type Storage interface {
-	AddFlow(flow *pb.Flow) (uuid.UUID, error)
-	ReadFlow(uuid uuid.UUID) (*pb.Flow, error)
+	AddFlow(flow *pb.Flow) (Key, error)
+	ReadFlow(key Key) (*pb.Flow, error)
 
-	AddPath(path *pb.Path) (uuid.UUID, error)
-	ReadPath(uuid uuid.UUID) (*pb.Path, error)
+	AddPath(path *pb.Path) (Key, error)
+	ReadPath(key Key) (*pb.Path, error)
 
-	AddFlowToPath(pathUUID uuid.UUID, flowUUID uuid.UUID) error
-	GetFlowsForPath(pathUUID uuid.UUID) ([]pb.Flow, error)
+	AddFlowToPath(pathKey Key, flowKey Key) error
+	GetFlowsForPath(pathKey Key) ([]pb.Flow, error)
 }
 
 const (
@@ -106,34 +104,37 @@ func (gs *GraphStorage) Close() {
 }
 
 // AddFlow adds a new Flow to the graph. If the Path does not exist, it will be added, else it will be made
-func (gs *GraphStorage) AddFlow(flow *pb.Flow) (uuid.UUID, error) {
-	pathUUID, err := gs.AddPath(flow.Path)
-	flowUUID := uuid.NewV4()
+func (gs *GraphStorage) AddFlow(flow *pb.Flow) (Key, error) {
+	pathKey, err := gs.AddPath(flow.Path)
+	if err != nil {
+		return Key{}, err
+	}
+	flowKey := NewRandomKey()
 	flowDTO := flowDTO{
-		ID:          uuidToQuadIRI(flowUUID),
+		ID:          flowKey.QuadIRI(),
 		Name:        flow.Name,
 		Description: flow.Description,
-		Path:        uuidToQuadIRI(pathUUID),
+		Path:        pathKey.QuadIRI(),
 	}
 	err = gs.writeToGraph(flowDTO)
 	if err != nil {
-		return uuid.Nil, err
+		return Key{}, err
 	}
-	return flowUUID, nil
+	return flowKey, nil
 }
 
 // ReadFlow returns a Flow of the sepcified uuid from the graph
-func (gs *GraphStorage) ReadFlow(uuid uuid.UUID) (*pb.Flow, error) {
+func (gs *GraphStorage) ReadFlow(key Key) (*pb.Flow, error) {
 	var flowDTO flowDTO
-	err := schema.LoadTo(nil, gs.store, &flowDTO, uuidToQuadIRI(uuid))
+	err := schema.LoadTo(nil, gs.store, &flowDTO, key.QuadValue())
 	if err != nil {
 		return nil, err
 	}
-	pathUUID, err := quadIRIToUUID(flowDTO.Path)
+	pathKey, err := NewKeyFromQuadIRI(flowDTO.Path)
 	if err != nil {
 		return nil, err
 	}
-	path, err := gs.ReadPath(pathUUID)
+	path, err := gs.ReadPath(pathKey)
 	if err != nil {
 		return nil, err
 	}
@@ -148,38 +149,38 @@ func (gs *GraphStorage) ReadFlow(uuid uuid.UUID) (*pb.Flow, error) {
 }
 
 // AddPath adds path to graph if new, else it will return the id of the existing path. Path are unique based on route and type combined
-func (gs *GraphStorage) AddPath(path *pb.Path) (uuid.UUID, error) {
+func (gs *GraphStorage) AddPath(path *pb.Path) (Key, error) {
 	// Find if Path already exist. If so, return the Path's id
 	p := cayley.StartPath(gs.store, quad.StringToValue(path.Type)).In(quad.IRI("type")).Has(quad.IRI("route"), quad.StringToValue(path.Route))
 	pathList, err := p.Iterate(nil).Limit(1).AllValues(gs.store)
 	if err != nil {
-		return uuid.Nil, err
+		return Key{}, err
 	}
 	if len(pathList) == 1 {
-		pathUUID, err := quadValueToUUID(pathList[0])
+		pathKey, err := NewKeyFromQuadValue(pathList[0])
 		if err != nil {
-			return uuid.Nil, err
+			return Key{}, err
 		}
-		return pathUUID, nil
+		return pathKey, nil
 	}
 	// Insert new Path
-	pathID := uuid.NewV4()
+	pathKey := NewRandomKey()
 	pathDTO := pathDTO{
-		ID:    uuidToQuadIRI(pathID),
+		ID:    pathKey.QuadIRI(),
 		Route: path.Route,
 		Type:  path.Type,
 	}
 	err = gs.writeToGraph(pathDTO)
 	if err != nil {
-		return uuid.Nil, err
+		return Key{}, err
 	}
-	return pathID, nil
+	return pathKey, nil
 }
 
 // ReadPath returns Path based on uuid.
-func (gs *GraphStorage) ReadPath(uuid uuid.UUID) (*pb.Path, error) {
+func (gs *GraphStorage) ReadPath(key Key) (*pb.Path, error) {
 	var pathDTO pathDTO
-	err := schema.LoadTo(nil, gs.store, &pathDTO, uuidToQuadIRI(uuid))
+	err := schema.LoadTo(nil, gs.store, &pathDTO, key.QuadValue())
 	if err != nil {
 		return nil, err
 	}
@@ -190,22 +191,22 @@ func (gs *GraphStorage) ReadPath(uuid uuid.UUID) (*pb.Path, error) {
 }
 
 // AddFlowToPath connects Flows to be triggered by a Path
-func (gs *GraphStorage) AddFlowToPath(pathUUID uuid.UUID, flowUUID uuid.UUID) error {
-	pathCheck, err := gs.uuidExists(pathUUID)
+func (gs *GraphStorage) AddFlowToPath(pathKey Key, flowKey Key) error {
+	pathCheck, err := gs.uuidExists(pathKey)
 	switch {
 	case err != nil:
 		return err
 	case pathCheck == false:
-		return errors.New("Path UUID does no exist in graph")
+		return errors.New("Path Key does no exist in graph")
 	}
-	flowCheck, err := gs.uuidExists(flowUUID)
+	flowCheck, err := gs.uuidExists(flowKey)
 	switch {
 	case err != nil:
 		return err
 	case flowCheck == false:
-		return errors.New("Flow UUID does no exist in graph")
+		return errors.New("Flow Key does no exist in graph")
 	}
-	err = gs.store.AddQuad(quad.Make(uuidToQuadValue(pathUUID), quad.IRI("triggers"), uuidToQuadValue(flowUUID), nil))
+	err = gs.store.AddQuad(quad.Make(pathKey.QuadValue(), quad.IRI("triggers"), flowKey.QuadValue(), nil))
 	if err != nil {
 		return err
 	}
@@ -213,19 +214,19 @@ func (gs *GraphStorage) AddFlowToPath(pathUUID uuid.UUID, flowUUID uuid.UUID) er
 }
 
 // GetFlowsForPath returns a list of Flows that are triggers by the Flow
-func (gs *GraphStorage) GetFlowsForPath(pathUUID uuid.UUID) ([]pb.Flow, error) {
-	p := cayley.StartPath(gs.store, uuidToQuadValue(pathUUID)).Out(quad.IRI("triggers"))
+func (gs *GraphStorage) GetFlowsForPath(pathKey Key) ([]pb.Flow, error) {
+	p := cayley.StartPath(gs.store, pathKey.QuadValue()).Out(quad.IRI("triggers"))
 	flowQValues, err := p.Iterate(nil).AllValues(gs.store)
 	if err != nil {
 		return nil, err
 	}
 	flowList := []pb.Flow{}
 	for _, v := range flowQValues {
-		uuid, err := quadValueToUUID(v)
+		key, err := NewKeyFromQuadValue(v)
 		if err != nil {
 			return nil, err
 		}
-		flow, err := gs.ReadFlow(uuid)
+		flow, err := gs.ReadFlow(key)
 		if err != nil {
 			return nil, err
 		}
@@ -234,37 +235,8 @@ func (gs *GraphStorage) GetFlowsForPath(pathUUID uuid.UUID) ([]pb.Flow, error) {
 	return flowList, nil
 }
 
-func uuidToQuadIRI(uuid uuid.UUID) quad.IRI {
-	return quad.IRI(uuid.String()).Short()
-}
-
-func uuidToQuadValue(uuid uuid.UUID) quad.Value {
-	return quad.StringToValue("<" + uuid.String() + ">")
-}
-
-func quadValueToUUID(quadValue quad.Value) (uuid.UUID, error) {
-	return uuid.FromString(removeIDBrackets(quadValue.String()))
-}
-
-func quadIRIToUUID(quadIRI quad.IRI) (uuid.UUID, error) {
-	return uuid.FromString(removeIDBrackets(quadIRI.String()))
-}
-
-func removeIDBrackets(s string) string {
-	return strings.TrimFunc(s, func(r rune) bool {
-		switch r {
-		case '>':
-			return true
-		case '<':
-			return true
-		default:
-			return false
-		}
-	})
-}
-
-func (gs *GraphStorage) uuidExists(uuid uuid.UUID) (bool, error) {
-	v, err := cayley.StartPath(gs.store, uuidToQuadValue(uuid)).Iterate(nil).AllValues(gs.store)
+func (gs *GraphStorage) uuidExists(key Key) (bool, error) {
+	v, err := cayley.StartPath(gs.store, key.QuadValue()).Iterate(nil).AllValues(gs.store)
 	switch {
 	case err != nil:
 		return false, err
