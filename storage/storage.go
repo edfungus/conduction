@@ -20,18 +20,18 @@ import (
 )
 
 type Storage interface {
-	AddFlow(flow *pb.Flow) (Key, error)
-	ReadFlow(key Key) (*pb.Flow, error)
+	AddFlow(flow pb.Flow) (Key, error)
+	ReadFlow(key Key) (pb.Flow, error)
 
-	AddPath(path *pb.Path) (Key, error)
-	ReadPath(key Key) (*pb.Path, error)
+	AddPath(path pb.Path) (Key, error)
+	ReadPath(key Key) (pb.Path, error)
 
-	AddFlowToPath(pathKey Key, flowKey Key) error
-	GetFlowsForPath(pathKey Key) ([]pb.Flow, error)
+	LinkFlowToPath(flowKey Key, pathKey Key) error
+	GetLinkedFlows(key Key) ([]pb.Flow, error)
 }
 
 const (
-	DATABASE_URL string = "postgresql://%s@%s:%d/%s?sslmode=disable"
+	databaseURL string = "postgresql://%s@%s:%d/%s?sslmode=disable"
 )
 
 // Logger logs but can be replaced
@@ -67,7 +67,7 @@ type pathDTO struct {
 // NewGraphStorage returns a new Storage that uses Cayley and CockroachDB
 func NewGraphStorage(config *GraphStorageConfig) (*GraphStorage, error) {
 	return NewGraphStorageBolt() // overriding sql for now
-	databasePath := fmt.Sprintf(DATABASE_URL, config.User, config.Host, config.Port, config.DatabaseName)
+	databasePath := fmt.Sprintf(databaseURL, config.User, config.Host, config.Port, config.DatabaseName)
 	opts := graph.Options{"flavor": config.DatabaseType}
 	initDatabase(databasePath, config.DatabaseName, opts)
 	store, err := cayley.NewGraph("sql", databasePath, opts)
@@ -104,8 +104,8 @@ func (gs *GraphStorage) Close() {
 }
 
 // AddFlow adds a new Flow to the graph. If the Path does not exist, it will be added, else it will be made
-func (gs *GraphStorage) AddFlow(flow *pb.Flow) (Key, error) {
-	pathKey, err := gs.AddPath(flow.Path)
+func (gs *GraphStorage) AddFlow(flow pb.Flow) (Key, error) {
+	pathKey, err := gs.AddPath(*flow.Path)
 	if err != nil {
 		return Key{}, err
 	}
@@ -124,21 +124,21 @@ func (gs *GraphStorage) AddFlow(flow *pb.Flow) (Key, error) {
 }
 
 // ReadFlow returns a Flow of the sepcified uuid from the graph
-func (gs *GraphStorage) ReadFlow(key Key) (*pb.Flow, error) {
+func (gs *GraphStorage) ReadFlow(key Key) (pb.Flow, error) {
 	var flowDTO flowDTO
 	err := schema.LoadTo(nil, gs.store, &flowDTO, key.QuadValue())
 	if err != nil {
-		return nil, err
+		return pb.Flow{}, err
 	}
 	pathKey, err := NewKeyFromQuadIRI(flowDTO.Path)
 	if err != nil {
-		return nil, err
+		return pb.Flow{}, err
 	}
 	path, err := gs.ReadPath(pathKey)
 	if err != nil {
-		return nil, err
+		return pb.Flow{}, err
 	}
-	return &pb.Flow{
+	return pb.Flow{
 		Name:        flowDTO.Name,
 		Description: flowDTO.Description,
 		Path: &pb.Path{
@@ -149,7 +149,7 @@ func (gs *GraphStorage) ReadFlow(key Key) (*pb.Flow, error) {
 }
 
 // AddPath adds path to graph if new, else it will return the id of the existing path. Path are unique based on route and type combined
-func (gs *GraphStorage) AddPath(path *pb.Path) (Key, error) {
+func (gs *GraphStorage) AddPath(path pb.Path) (Key, error) {
 	// Find if Path already exist. If so, return the Path's id
 	p := cayley.StartPath(gs.store, quad.StringToValue(path.Type)).In(quad.IRI("type")).Has(quad.IRI("route"), quad.StringToValue(path.Route))
 	pathList, err := p.Iterate(nil).Limit(1).AllValues(gs.store)
@@ -178,20 +178,20 @@ func (gs *GraphStorage) AddPath(path *pb.Path) (Key, error) {
 }
 
 // ReadPath returns Path based on uuid.
-func (gs *GraphStorage) ReadPath(key Key) (*pb.Path, error) {
+func (gs *GraphStorage) ReadPath(key Key) (pb.Path, error) {
 	var pathDTO pathDTO
 	err := schema.LoadTo(nil, gs.store, &pathDTO, key.QuadValue())
 	if err != nil {
-		return nil, err
+		return pb.Path{}, err
 	}
-	return &pb.Path{
+	return pb.Path{
 		Route: pathDTO.Route,
 		Type:  pathDTO.Type,
 	}, nil
 }
 
-// AddFlowToPath connects Flows to be triggered by a Path
-func (gs *GraphStorage) AddFlowToPath(pathKey Key, flowKey Key) error {
+// LinkFlowToPath connects Flows to be triggered by a Path
+func (gs *GraphStorage) LinkFlowToPath(flowKey Key, pathKey Key) error {
 	pathCheck, err := gs.uuidExists(pathKey)
 	switch {
 	case err != nil:
@@ -213,9 +213,9 @@ func (gs *GraphStorage) AddFlowToPath(pathKey Key, flowKey Key) error {
 	return nil
 }
 
-// GetFlowsForPath returns a list of Flows that are triggers by the Flow
-func (gs *GraphStorage) GetFlowsForPath(pathKey Key) ([]pb.Flow, error) {
-	p := cayley.StartPath(gs.store, pathKey.QuadValue()).Out(quad.IRI("triggers"))
+// GetLinkedFlows returns a list of Flows that are triggers by the Flow
+func (gs *GraphStorage) GetLinkedFlows(key Key) ([]pb.Flow, error) {
+	p := cayley.StartPath(gs.store, key.QuadValue()).Out(quad.IRI("triggers"))
 	flowQValues, err := p.Iterate(nil).AllValues(gs.store)
 	if err != nil {
 		return nil, err
@@ -230,7 +230,7 @@ func (gs *GraphStorage) GetFlowsForPath(pathKey Key) ([]pb.Flow, error) {
 		if err != nil {
 			return nil, err
 		}
-		flowList = append(flowList, *flow)
+		flowList = append(flowList, flow)
 	}
 	return flowList, nil
 }

@@ -23,9 +23,9 @@ type Messenger interface {
 }
 
 const (
-	MESSAGE_PARTITION string = "messagePartition"
-	MESSAGE_OFFSET    string = "messageOffset"
-	MESSAGE_TOPIC     string = "messageTopic"
+	messagePartition string = "messagePartition"
+	messageOffset    string = "messageOffset"
+	messageTopic     string = "messageTopic"
 )
 
 // Logger logs but can be replaced
@@ -162,13 +162,13 @@ func setMessageMetadata(msg *sarama.ConsumerMessage, msgObj *pb.Message) {
 
 	partition := make([]byte, 8)
 	binary.PutVarint(partition, int64(msg.Partition))
-	msgObj.Metadata[MESSAGE_PARTITION] = partition
+	msgObj.Metadata[messagePartition] = partition
 
 	offset := make([]byte, 8)
 	binary.PutVarint(offset, msg.Offset)
-	msgObj.Metadata[MESSAGE_OFFSET] = offset
+	msgObj.Metadata[messageOffset] = offset
 
-	msgObj.Metadata[MESSAGE_TOPIC] = []byte(msg.Topic)
+	msgObj.Metadata[messageTopic] = []byte(msg.Topic)
 }
 
 // Gets the Kafka metadata from Message
@@ -178,12 +178,12 @@ func getMessageMetadata(msg *pb.Message) (string, int32, int64, error) {
 		partition int32
 		offset    int64
 	)
-	if val, ok := msg.Metadata[MESSAGE_TOPIC]; ok {
+	if val, ok := msg.Metadata[messageTopic]; ok {
 		topic = string(val)
 	} else {
 		return "", 0, 0, errors.New("Could not find topic in Message metadata")
 	}
-	if val, ok := msg.Metadata[MESSAGE_PARTITION]; ok {
+	if val, ok := msg.Metadata[messagePartition]; ok {
 		partition64, err := binary.ReadVarint(bytes.NewReader(val))
 		if err != nil {
 			return "", 0, 0, errors.New("Could read partition as int64")
@@ -192,7 +192,7 @@ func getMessageMetadata(msg *pb.Message) (string, int32, int64, error) {
 	} else {
 		return "", 0, 0, errors.New("Could not find topic in Message metadata")
 	}
-	if val, ok := msg.Metadata[MESSAGE_OFFSET]; ok {
+	if val, ok := msg.Metadata[messageOffset]; ok {
 		var err error
 		offset, err = binary.ReadVarint(bytes.NewReader(val))
 		if err != nil {

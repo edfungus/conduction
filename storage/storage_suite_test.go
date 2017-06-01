@@ -41,7 +41,7 @@ func TestStorage(t *testing.T) {
 }
 
 func dropDatabase(databaseHost string, databasePort int, databaseName string) error {
-	databasePath := fmt.Sprintf(DATABASE_URL, "root", databaseHost, databasePort, databaseName)
+	databasePath := fmt.Sprintf(databaseURL, "root", databaseHost, databasePort, databaseName)
 	db, err := sql.Open("postgres", databasePath)
 	if err != nil {
 		return err

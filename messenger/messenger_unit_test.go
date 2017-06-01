@@ -110,21 +110,21 @@ var _ = Describe("Conduction", func() {
 			})
 			Context("When topic is not present", func() {
 				It("Then an error should be returned regarding topic", func() {
-					delete(messageToRead.Metadata, MESSAGE_TOPIC)
+					delete(messageToRead.Metadata, messageTopic)
 					_, _, _, err := getMessageMetadata(messageToRead)
 					Expect(err).ToNot(BeNil())
 				})
 			})
 			Context("When partition is not present", func() {
 				It("Then an error should be returned regarding partition", func() {
-					delete(messageToRead.Metadata, MESSAGE_PARTITION)
+					delete(messageToRead.Metadata, messagePartition)
 					_, _, _, err := getMessageMetadata(messageToRead)
 					Expect(err).ToNot(BeNil())
 				})
 			})
 			Context("When offset is not present", func() {
 				It("Then an error should be returned regarding offset", func() {
-					delete(messageToRead.Metadata, MESSAGE_OFFSET)
+					delete(messageToRead.Metadata, messageOffset)
 					_, _, _, err := getMessageMetadata(messageToRead)
 					Expect(err).ToNot(BeNil())
 				})

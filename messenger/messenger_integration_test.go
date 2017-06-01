@@ -63,9 +63,9 @@ var _ = Describe("Conduction", func() {
 					case msg := <-messenger.Receive():
 						Expect(err).To(BeNil())
 						Expect(msg.Payload).To(Equal(message.Payload))
-						Expect(msg.Metadata).To(HaveKey(MESSAGE_PARTITION))
-						Expect(msg.Metadata).To(HaveKey(MESSAGE_OFFSET))
-						Expect(msg.Metadata).To(HaveKey(MESSAGE_TOPIC))
+						Expect(msg.Metadata).To(HaveKey(messagePartition))
+						Expect(msg.Metadata).To(HaveKey(messageOffset))
+						Expect(msg.Metadata).To(HaveKey(messageTopic))
 
 						err = messenger.Acknowledge(msg)
 						Expect(err).To(BeNil())
@@ -98,9 +98,9 @@ var _ = Describe("Conduction", func() {
 					case msg := <-messenger.Receive():
 						Expect(err).To(BeNil())
 						Expect(msg.Payload).To(Equal(message.Payload))
-						Expect(msg.Metadata).To(HaveKey(MESSAGE_PARTITION))
-						Expect(msg.Metadata).To(HaveKey(MESSAGE_OFFSET))
-						Expect(msg.Metadata).To(HaveKey(MESSAGE_TOPIC))
+						Expect(msg.Metadata).To(HaveKey(messagePartition))
+						Expect(msg.Metadata).To(HaveKey(messageOffset))
+						Expect(msg.Metadata).To(HaveKey(messageTopic))
 					case <-time.After(time.Second * 10):
 						Fail("Message took too long to send and receive")
 					}
@@ -115,9 +115,9 @@ var _ = Describe("Conduction", func() {
 					case msg := <-messenger.Receive():
 						Expect(err).To(BeNil())
 						Expect(msg.Payload).To(Equal(message.Payload))
-						Expect(msg.Metadata).To(HaveKey(MESSAGE_PARTITION))
-						Expect(msg.Metadata).To(HaveKey(MESSAGE_OFFSET))
-						Expect(msg.Metadata).To(HaveKey(MESSAGE_TOPIC))
+						Expect(msg.Metadata).To(HaveKey(messagePartition))
+						Expect(msg.Metadata).To(HaveKey(messageOffset))
+						Expect(msg.Metadata).To(HaveKey(messageTopic))
 
 						err = messenger.Acknowledge(msg)
 						Expect(err).To(BeNil())

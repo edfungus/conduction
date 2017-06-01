@@ -59,7 +59,7 @@ var _ = Describe("Conduction", func() {
 		Describe("Given saving a Flow to graph", func() {
 			Context("When the Path does not exist", func() {
 				It("Then the Path and Flow should also be inserted connected to Path", func() {
-					flow := &pb.Flow{
+					flow := pb.Flow{
 						Name:        "Flow Name",
 						Description: "Flow Description",
 						Path: &pb.Path{
@@ -84,7 +84,7 @@ var _ = Describe("Conduction", func() {
 					// Save Path
 					pathRoute := "/test"
 					pathType := "mqtt-duplicate"
-					path := &pb.Path{
+					path := pb.Path{
 						Route: pathRoute,
 						Type:  pathType,
 					}
@@ -93,7 +93,7 @@ var _ = Describe("Conduction", func() {
 					Expect(pathKey).ToNot(Equal(Key{}))
 
 					// Save flow with same path route and type
-					flow := &pb.Flow{
+					flow := pb.Flow{
 						Name:        "Flow Name",
 						Description: "Flow Description",
 						Path: &pb.Path{
@@ -127,7 +127,7 @@ var _ = Describe("Conduction", func() {
 					// Path to save
 					pathRoute := "/unique/path"
 					pathType := "mqtt-duplicate"
-					path := &pb.Path{
+					path := pb.Path{
 						Route: pathRoute,
 						Type:  pathType,
 					}
@@ -157,7 +157,7 @@ var _ = Describe("Conduction", func() {
 					// Path to save
 					pathRoute := "/unique/path"
 					pathType := "mqtt-unique"
-					path := &pb.Path{
+					path := pb.Path{
 						Route: pathRoute,
 						Type:  pathType,
 					}
@@ -191,7 +191,7 @@ var _ = Describe("Conduction", func() {
 					// Save Path
 					pathTriggerRoute := "/test"
 					pathTriggerType := "path-trigger"
-					pathTrigger := &pb.Path{
+					pathTrigger := pb.Path{
 						Route: pathTriggerRoute,
 						Type:  pathTriggerType,
 					}
@@ -200,7 +200,7 @@ var _ = Describe("Conduction", func() {
 					Expect(pathTriggerKey).ToNot(Equal(Key{}))
 
 					// Save Flow
-					flow := &pb.Flow{
+					flow := pb.Flow{
 						Name:        "Flow Name",
 						Description: "Flow Description",
 						Path: &pb.Path{
@@ -213,7 +213,7 @@ var _ = Describe("Conduction", func() {
 					Expect(flowKey).ToNot(Equal(Key{}))
 
 					// Connect Flow to Path
-					err = graph.AddFlowToPath(pathTriggerKey, flowKey)
+					err = graph.LinkFlowToPath(flowKey, pathTriggerKey)
 					Expect(err).To(BeNil())
 
 					// Check that Path connects to the Flow with vertex "triggers"
@@ -229,7 +229,7 @@ var _ = Describe("Conduction", func() {
 					// Save Path
 					pathTriggerRoute := "/test"
 					pathTriggerType := "path-trigger"
-					pathTrigger := &pb.Path{
+					pathTrigger := pb.Path{
 						Route: pathTriggerRoute,
 						Type:  pathTriggerType,
 					}
@@ -238,7 +238,7 @@ var _ = Describe("Conduction", func() {
 					Expect(pathTriggerKey).ToNot(Equal(uuid.Nil))
 
 					// Save both Flows
-					flow := &pb.Flow{
+					flow := pb.Flow{
 						Name:        "Flow Name",
 						Description: "Flow Description",
 						Path: &pb.Path{
@@ -254,9 +254,9 @@ var _ = Describe("Conduction", func() {
 					Expect(flowKey2).ToNot(Equal(Key{}))
 
 					// Connect Flow to Path
-					err = graph.AddFlowToPath(pathTriggerKey, flowKey1)
+					err = graph.LinkFlowToPath(flowKey1, pathTriggerKey)
 					Expect(err).To(BeNil())
-					err = graph.AddFlowToPath(pathTriggerKey, flowKey2)
+					err = graph.LinkFlowToPath(flowKey2, pathTriggerKey)
 					Expect(err).To(BeNil())
 
 					// Check that Path connects to both Flow 1 and Flow 2
@@ -281,7 +281,7 @@ var _ = Describe("Conduction", func() {
 					// Save Path
 					pathTriggerRoute := "/test"
 					pathTriggerType := "path-trigger"
-					pathTrigger := &pb.Path{
+					pathTrigger := pb.Path{
 						Route: pathTriggerRoute,
 						Type:  pathTriggerType,
 					}
@@ -290,7 +290,7 @@ var _ = Describe("Conduction", func() {
 					Expect(pathTriggerKey).ToNot(Equal(Key{}))
 
 					// Save Flow
-					flow := &pb.Flow{
+					flow := pb.Flow{
 						Name:        "Flow Name",
 						Description: "Flow Description",
 						Path: &pb.Path{
@@ -303,9 +303,9 @@ var _ = Describe("Conduction", func() {
 					Expect(flowKey).ToNot(Equal(Key{}))
 
 					// Connect bad Flow id or Path id
-					err = graph.AddFlowToPath(pathTriggerKey, NewRandomKey())
+					err = graph.LinkFlowToPath(NewRandomKey(), pathTriggerKey)
 					Expect(err).ToNot(BeNil())
-					err = graph.AddFlowToPath(NewRandomKey(), flowKey)
+					err = graph.LinkFlowToPath(flowKey, NewRandomKey())
 					Expect(err).ToNot(BeNil())
 				})
 			})
@@ -316,7 +316,7 @@ var _ = Describe("Conduction", func() {
 					// Save Path
 					pathTriggerRoute := "/test"
 					pathTriggerType := "path-trigger"
-					pathTrigger := &pb.Path{
+					pathTrigger := pb.Path{
 						Route: pathTriggerRoute,
 						Type:  pathTriggerType,
 					}
@@ -325,7 +325,7 @@ var _ = Describe("Conduction", func() {
 					Expect(pathTriggerKey).ToNot(Equal(Key{}))
 
 					// Save both Flows
-					flow := &pb.Flow{
+					flow := pb.Flow{
 						Name:        "Flow Name",
 						Description: "Flow Description",
 						Path: &pb.Path{
@@ -341,17 +341,17 @@ var _ = Describe("Conduction", func() {
 					Expect(flowKey2).ToNot(Equal(Key{}))
 
 					// Connect Flow to Path
-					err = graph.AddFlowToPath(pathTriggerKey, flowKey1)
+					err = graph.LinkFlowToPath(flowKey1, pathTriggerKey)
 					Expect(err).To(BeNil())
-					err = graph.AddFlowToPath(pathTriggerKey, flowKey2)
+					err = graph.LinkFlowToPath(flowKey2, pathTriggerKey)
 					Expect(err).To(BeNil())
 
 					// Get Flows
-					flows, err := graph.GetFlowsForPath(pathTriggerKey)
+					flows, err := graph.GetLinkedFlows(pathTriggerKey)
 					Expect(err).To(BeNil())
 					Expect(len(flows)).To(Equal(2))
-					Expect(flows[0]).To(Equal(*flow))
-					Expect(flows[1]).To(Equal(*flow))
+					Expect(flows[0]).To(Equal(flow))
+					Expect(flows[1]).To(Equal(flow))
 				})
 			})
 		})
