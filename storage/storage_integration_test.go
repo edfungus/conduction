@@ -15,18 +15,18 @@ import (
 var _ = Describe("Conduction", func() {
 	Describe("Storage", func() {
 		var (
-			graph  *GraphStorage
-			config = &GraphStorageConfig{
-				Host:         databaseHost,
-				Port:         databasePort,
-				User:         "root",
-				DatabaseName: databaseName,
-				DatabaseType: "cockroach",
-			}
+			graph *GraphStorage
+			// config = GraphStorageConfig{
+			// 	Host:         databaseHost,
+			// 	Port:         databasePort,
+			// 	User:         "root",
+			// 	DatabaseName: databaseName,
+			// 	DatabaseType: "cockroach",
+			// }
 		)
 		BeforeEach(func() {
 			var err error
-			graph, err = NewGraphStorage(config)
+			graph, err = NewGraphStorageBolt()
 			Expect(err).To(BeNil())
 			Expect(graph).ToNot(BeNil())
 		})
@@ -50,7 +50,7 @@ var _ = Describe("Conduction", func() {
 			})
 			Context("When Cockroach path is correct and available", func() {
 				It("Then GraphStorage should return without error", func() {
-					graph, err := NewGraphStorage(config)
+					graph, err := NewGraphStorageBolt()
 					Expect(err).To(BeNil())
 					Expect(graph).ToNot(BeNil())
 				})
@@ -67,11 +67,11 @@ var _ = Describe("Conduction", func() {
 							Type:  "mqtt-duplicate",
 						},
 					}
-					key, err := graph.AddFlow(flow)
+					key, err := graph.SaveFlow(flow)
 					Expect(err).To(BeNil())
 					Expect(key).ToNot(Equal(Key{}))
 
-					newFlow, err := graph.ReadFlow(key)
+					newFlow, err := graph.GetFlowByKey(key)
 					Expect(err).To(BeNil())
 					Expect(newFlow.Name).To(Equal(flow.Name))
 					Expect(newFlow.Description).To(Equal(flow.Description))
@@ -88,7 +88,7 @@ var _ = Describe("Conduction", func() {
 						Route: pathRoute,
 						Type:  pathType,
 					}
-					pathKey, err := graph.AddPath(path)
+					pathKey, err := graph.SavePath(path)
 					Expect(err).To(BeNil())
 					Expect(pathKey).ToNot(Equal(Key{}))
 
@@ -101,7 +101,7 @@ var _ = Describe("Conduction", func() {
 							Type:  path.Type,
 						},
 					}
-					flowKey, err := graph.AddFlow(flow)
+					flowKey, err := graph.SaveFlow(flow)
 					Expect(err).To(BeNil())
 					Expect(flowKey).ToNot(Equal(Key{}))
 
@@ -112,7 +112,7 @@ var _ = Describe("Conduction", func() {
 					Expect(len(pathList)).To(Equal(1))
 
 					// Check that Flow was correctly saved
-					newFlow, err := graph.ReadFlow(flowKey)
+					newFlow, err := graph.GetFlowByKey(flowKey)
 					Expect(err).To(BeNil())
 					Expect(newFlow.Name).To(Equal(flow.Name))
 					Expect(newFlow.Description).To(Equal(flow.Description))
@@ -133,9 +133,9 @@ var _ = Describe("Conduction", func() {
 					}
 
 					// Insert Path twice
-					pathKey1, err := graph.AddPath(path)
+					pathKey1, err := graph.SavePath(path)
 					Expect(err).To(BeNil())
-					pathKey2, err := graph.AddPath(path)
+					pathKey2, err := graph.SavePath(path)
 					Expect(err).To(BeNil())
 					Expect(pathKey1).To(Equal(pathKey2))
 
@@ -146,10 +146,10 @@ var _ = Describe("Conduction", func() {
 					Expect(len(pathList)).To(Equal(1))
 
 					// Check Path content
-					readPath, err := graph.ReadPath(pathKey1)
+					GetPathByKey, err := graph.GetPathByKey(pathKey1)
 					Expect(err).To(BeNil())
-					Expect(readPath.Route).To(Equal(path.Route))
-					Expect(readPath.Type).To(Equal(path.Type))
+					Expect(GetPathByKey.Route).To(Equal(path.Route))
+					Expect(GetPathByKey.Type).To(Equal(path.Type))
 				})
 			})
 			Context("When the Path does not already exist", func() {
@@ -169,7 +169,7 @@ var _ = Describe("Conduction", func() {
 					Expect(len(pathList)).To(Equal(0))
 
 					// Insert Path
-					pathKey, err := graph.AddPath(path)
+					pathKey, err := graph.SavePath(path)
 
 					// Check Path was added
 					p = cayley.StartPath(graph.store, quad.StringToValue(pathType)).In(quad.StringToValue("<type>")).Has(quad.StringToValue("<route>"), quad.StringToValue(pathRoute))
@@ -178,10 +178,10 @@ var _ = Describe("Conduction", func() {
 					Expect(len(pathList)).To(Equal(1))
 
 					// Check Path content
-					readPath, err := graph.ReadPath(pathKey)
+					GetPathByKey, err := graph.GetPathByKey(pathKey)
 					Expect(err).To(BeNil())
-					Expect(readPath.Route).To(Equal(path.Route))
-					Expect(readPath.Type).To(Equal(path.Type))
+					Expect(GetPathByKey.Route).To(Equal(path.Route))
+					Expect(GetPathByKey.Type).To(Equal(path.Type))
 				})
 			})
 		})
@@ -195,7 +195,7 @@ var _ = Describe("Conduction", func() {
 						Route: pathTriggerRoute,
 						Type:  pathTriggerType,
 					}
-					pathTriggerKey, err := graph.AddPath(pathTrigger)
+					pathTriggerKey, err := graph.SavePath(pathTrigger)
 					Expect(err).To(BeNil())
 					Expect(pathTriggerKey).ToNot(Equal(Key{}))
 
@@ -208,12 +208,12 @@ var _ = Describe("Conduction", func() {
 							Type:  "mqtt",
 						},
 					}
-					flowKey, err := graph.AddFlow(flow)
+					flowKey, err := graph.SaveFlow(flow)
 					Expect(err).To(BeNil())
 					Expect(flowKey).ToNot(Equal(Key{}))
 
 					// Connect Flow to Path
-					err = graph.LinkFlowToPath(flowKey, pathTriggerKey)
+					err = graph.ChainNextFlowToPath(flowKey, pathTriggerKey)
 					Expect(err).To(BeNil())
 
 					// Check that Path connects to the Flow with vertex "triggers"
@@ -233,7 +233,7 @@ var _ = Describe("Conduction", func() {
 						Route: pathTriggerRoute,
 						Type:  pathTriggerType,
 					}
-					pathTriggerKey, err := graph.AddPath(pathTrigger)
+					pathTriggerKey, err := graph.SavePath(pathTrigger)
 					Expect(err).To(BeNil())
 					Expect(pathTriggerKey).ToNot(Equal(uuid.Nil))
 
@@ -246,17 +246,17 @@ var _ = Describe("Conduction", func() {
 							Type:  "mqtt",
 						},
 					}
-					flowKey1, err := graph.AddFlow(flow)
+					flowKey1, err := graph.SaveFlow(flow)
 					Expect(err).To(BeNil())
 					Expect(flowKey1).ToNot(Equal(Key{}))
-					flowKey2, err := graph.AddFlow(flow)
+					flowKey2, err := graph.SaveFlow(flow)
 					Expect(err).To(BeNil())
 					Expect(flowKey2).ToNot(Equal(Key{}))
 
 					// Connect Flow to Path
-					err = graph.LinkFlowToPath(flowKey1, pathTriggerKey)
+					err = graph.ChainNextFlowToPath(flowKey1, pathTriggerKey)
 					Expect(err).To(BeNil())
-					err = graph.LinkFlowToPath(flowKey2, pathTriggerKey)
+					err = graph.ChainNextFlowToPath(flowKey2, pathTriggerKey)
 					Expect(err).To(BeNil())
 
 					// Check that Path connects to both Flow 1 and Flow 2
@@ -285,7 +285,7 @@ var _ = Describe("Conduction", func() {
 						Route: pathTriggerRoute,
 						Type:  pathTriggerType,
 					}
-					pathTriggerKey, err := graph.AddPath(pathTrigger)
+					pathTriggerKey, err := graph.SavePath(pathTrigger)
 					Expect(err).To(BeNil())
 					Expect(pathTriggerKey).ToNot(Equal(Key{}))
 
@@ -298,14 +298,14 @@ var _ = Describe("Conduction", func() {
 							Type:  "mqtt",
 						},
 					}
-					flowKey, err := graph.AddFlow(flow)
+					flowKey, err := graph.SaveFlow(flow)
 					Expect(err).To(BeNil())
 					Expect(flowKey).ToNot(Equal(Key{}))
 
 					// Connect bad Flow id or Path id
-					err = graph.LinkFlowToPath(NewRandomKey(), pathTriggerKey)
+					err = graph.ChainNextFlowToPath(NewRandomKey(), pathTriggerKey)
 					Expect(err).ToNot(BeNil())
-					err = graph.LinkFlowToPath(flowKey, NewRandomKey())
+					err = graph.ChainNextFlowToPath(flowKey, NewRandomKey())
 					Expect(err).ToNot(BeNil())
 				})
 			})
@@ -320,7 +320,7 @@ var _ = Describe("Conduction", func() {
 						Route: pathTriggerRoute,
 						Type:  pathTriggerType,
 					}
-					pathTriggerKey, err := graph.AddPath(pathTrigger)
+					pathTriggerKey, err := graph.SavePath(pathTrigger)
 					Expect(err).To(BeNil())
 					Expect(pathTriggerKey).ToNot(Equal(Key{}))
 
@@ -333,21 +333,21 @@ var _ = Describe("Conduction", func() {
 							Type:  "mqtt",
 						},
 					}
-					flowKey1, err := graph.AddFlow(flow)
+					flowKey1, err := graph.SaveFlow(flow)
 					Expect(err).To(BeNil())
 					Expect(flowKey1).ToNot(Equal(Key{}))
-					flowKey2, err := graph.AddFlow(flow)
+					flowKey2, err := graph.SaveFlow(flow)
 					Expect(err).To(BeNil())
 					Expect(flowKey2).ToNot(Equal(Key{}))
 
 					// Connect Flow to Path
-					err = graph.LinkFlowToPath(flowKey1, pathTriggerKey)
+					err = graph.ChainNextFlowToPath(flowKey1, pathTriggerKey)
 					Expect(err).To(BeNil())
-					err = graph.LinkFlowToPath(flowKey2, pathTriggerKey)
+					err = graph.ChainNextFlowToPath(flowKey2, pathTriggerKey)
 					Expect(err).To(BeNil())
 
 					// Get Flows
-					flows, err := graph.GetLinkedFlows(pathTriggerKey)
+					flows, err := graph.GetNextFlows(pathTriggerKey)
 					Expect(err).To(BeNil())
 					Expect(len(flows)).To(Equal(2))
 					Expect(flows[0]).To(Equal(flow))
