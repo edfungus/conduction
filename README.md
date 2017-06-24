@@ -4,7 +4,7 @@
 Work in progress! Event based Kafka router between protocols. A centralized router that can send messages between protocols. This allows easy rerouting without changing client code and a high level view to understand the communication between clients. 
 
 ```
-./protoc -I=/Users/edmundfung/workspace/go/src/github.com/edfungus/conduction/pb --go_out=/Users/edmundfung/workspace/go/src/github.com/edfungus/conduction/pb/ /Users/edmundfung/workspace/go/src/github.com/edfungus/conduction/pb/message.proto 
+./protoc -I=/Users/edmundfung/workspace/go/src/github.com/edfungus/conduction/messenger --go_out=/Users/edmundfung/workspace/go/src/github.com/edfungus/conduction/messenger/ /Users/edmundfung/workspace/go/src/github.com/edfungus/conduction/messenger/message.proto
 ```
 
 ### Examples ... aka thinking out loud

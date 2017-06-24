@@ -5,7 +5,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/edfungus/conduction/pb"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -39,9 +38,10 @@ func ClearKafkaTopic(broker string, topic string, consumerGroup string) {
 		panic(fmt.Sprintf("Could not connec to Kafka. Is Kafka running on %s? Error: %s", broker, err.Error()))
 	}
 	defer messenger.Close()
+	messenger.Start()
 
 	// Send dummy message
-	err = messenger.Send(topic, &pb.Message{
+	err = messenger.Send(topic, &Message{
 		Payload: []byte("payload"),
 	})
 	if err != nil {

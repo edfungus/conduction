@@ -1,32 +1,22 @@
 package messenger
 
 import (
-	"bytes"
-	"encoding/binary"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/Shopify/sarama"
 	cluster "github.com/bsm/sarama-cluster"
-	"github.com/edfungus/conduction/pb"
-	"github.com/golang/protobuf/proto"
 	"github.com/sirupsen/logrus"
 )
 
 // Messenger orchestrates communication between conduction modules
 type Messenger interface {
-	Send(topic string, msg pb.Message) error
-	Receive() <-chan pb.Message
-	Acknowledge(pb.Message) error
+	Start()
+	Send(topic string, msg Message) error
+	Receive() <-chan Message
+	Acknowledge(Message) error
 	Close() error
 }
-
-const (
-	messagePartition string = "messagePartition"
-	messageOffset    string = "messageOffset"
-	messageTopic     string = "messageTopic"
-)
 
 // Logger logs but can be replaced
 var Logger = logrus.New()
@@ -36,7 +26,7 @@ type KafkaMessenger struct {
 	producer sarama.SyncProducer
 	consumer *cluster.Consumer
 
-	messages chan *pb.Message
+	messages chan *Message
 	stop     chan bool
 }
 
@@ -47,48 +37,38 @@ type KafkaMessengerConfig struct {
 
 // NewKafkaMessenger returns a new KafkaMessenger
 func NewKafkaMessenger(broker string, config *KafkaMessengerConfig) (*KafkaMessenger, error) {
-	kafkaProducerConfig := sarama.NewConfig()
-	kafkaProducerConfig.Producer.RequiredAcks = sarama.WaitForAll
-	kafkaProducerConfig.Producer.Retry.Max = 2
-	kafkaProducerConfig.Producer.Return.Successes = true
+	kafkaProducerConfig := newKafkaProducerConfig()
 	kafkaProducer, err := sarama.NewSyncProducer([]string{broker}, kafkaProducerConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	kafkaConsumerConfig := cluster.NewConfig()
-	kafkaConsumerConfig.Consumer.Return.Errors = true
-	kafkaConsumerConfig.Consumer.Offsets.Initial = sarama.OffsetOldest
+	kafkaConsumerConfig := newKafkaConsumerConfig()
 	kafkaConsumer, err := cluster.NewConsumer([]string{broker}, config.ConsumerGroup, []string{config.InputTopic}, kafkaConsumerConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	messages := make(chan *pb.Message)
-	stop := make(chan bool, 1)
-	km := &KafkaMessenger{
+	return &KafkaMessenger{
 		producer: kafkaProducer,
 		consumer: kafkaConsumer,
-		messages: messages,
-		stop:     stop,
-	}
+		messages: make(chan *Message),
+		stop:     make(chan bool, 1),
+	}, nil
+}
 
+// Start begins listening to the messages coming into the topics
+func (km *KafkaMessenger) Start() {
 	go listen(km.consumer, km.messages, km.stop)
-
-	return km, nil
 }
 
 // Send sends messages to Kafka
-func (km *KafkaMessenger) Send(topic string, msg *pb.Message) error {
-	msgB, err := proto.Marshal(msg)
+func (km *KafkaMessenger) Send(topic string, message *Message) error {
+	saramaMessage, err := message.ConvertToSaramaProducerMessage(topic)
 	if err != nil {
 		return err
 	}
-	msgS := &sarama.ProducerMessage{
-		Topic: topic,
-		Value: sarama.ByteEncoder(msgB),
-	}
-	_, _, err = km.producer.SendMessage(msgS)
+	_, _, err = km.producer.SendMessage(saramaMessage)
 	if err != nil {
 		return err
 	}
@@ -96,13 +76,13 @@ func (km *KafkaMessenger) Send(topic string, msg *pb.Message) error {
 }
 
 // Receive returns messages from Kafka
-func (km *KafkaMessenger) Receive() <-chan *pb.Message {
+func (km *KafkaMessenger) Receive() <-chan *Message {
 	return km.messages
 }
 
 // Acknowledge tells Kafka that the message has been received and processed
-func (km *KafkaMessenger) Acknowledge(msg *pb.Message) error {
-	topic, partition, offset, err := getMessageMetadata(msg)
+func (km *KafkaMessenger) Acknowledge(message *Message) error {
+	topic, partition, offset, err := message.getTopicPartitionOffsetFromMessageMetadata()
 	if err != nil {
 		return err
 	}
@@ -121,17 +101,32 @@ func (km *KafkaMessenger) Close() error {
 	return nil
 }
 
-func listen(consumer *cluster.Consumer, messages chan *pb.Message, stop chan bool) {
+func newKafkaProducerConfig() *sarama.Config {
+	kafkaProducerConfig := sarama.NewConfig()
+	kafkaProducerConfig.Producer.RequiredAcks = sarama.WaitForAll
+	kafkaProducerConfig.Producer.Retry.Max = 2
+	kafkaProducerConfig.Producer.Return.Successes = true
+	return kafkaProducerConfig
+}
+
+func newKafkaConsumerConfig() *cluster.Config {
+	kafkaConsumerConfig := cluster.NewConfig()
+	kafkaConsumerConfig.Consumer.Return.Errors = true
+	kafkaConsumerConfig.Consumer.Offsets.Initial = sarama.OffsetOldest
+	return kafkaConsumerConfig
+}
+
+func listen(consumer *cluster.Consumer, messages chan *Message, stop chan bool) {
 	for {
 		select {
 		case msg := <-consumer.Messages():
-			msgObj, err := convertMessage(msg)
+			message, err := NewMessageFromSaramaConsumerMessage(msg)
 			if err != nil {
 				Logger.Debugln(err)
 				consumer.MarkOffset(msg, "")
 				continue
 			}
-			messages <- msgObj
+			messages <- message
 		case err := <-consumer.Errors():
 			Logger.Error(err.Error())
 		case <-stop:
@@ -144,67 +139,7 @@ func listen(consumer *cluster.Consumer, messages chan *pb.Message, stop chan boo
 	}
 }
 
-func convertMessage(msg *sarama.ConsumerMessage) (*pb.Message, error) {
-	msgObj := &pb.Message{}
-	err := proto.Unmarshal(msg.Value, msgObj)
-	if err != nil {
-		return nil, fmt.Errorf("Could not unmarshal message from Kafka. Skipping message. %v", err)
-	}
-	setMessageMetadata(msg, msgObj)
-	return msgObj, nil
-}
-
-// Puts the Kafka metadata into Message. This is primarily for acking
-func setMessageMetadata(msg *sarama.ConsumerMessage, msgObj *pb.Message) {
-	if msgObj.Metadata == nil {
-		msgObj.Metadata = make(map[string][]byte)
-	}
-
-	partition := make([]byte, 8)
-	binary.PutVarint(partition, int64(msg.Partition))
-	msgObj.Metadata[messagePartition] = partition
-
-	offset := make([]byte, 8)
-	binary.PutVarint(offset, msg.Offset)
-	msgObj.Metadata[messageOffset] = offset
-
-	msgObj.Metadata[messageTopic] = []byte(msg.Topic)
-}
-
-// Gets the Kafka metadata from Message
-func getMessageMetadata(msg *pb.Message) (string, int32, int64, error) {
-	var (
-		topic     string
-		partition int32
-		offset    int64
-	)
-	if val, ok := msg.Metadata[messageTopic]; ok {
-		topic = string(val)
-	} else {
-		return "", 0, 0, errors.New("Could not find topic in Message metadata")
-	}
-	if val, ok := msg.Metadata[messagePartition]; ok {
-		partition64, err := binary.ReadVarint(bytes.NewReader(val))
-		if err != nil {
-			return "", 0, 0, errors.New("Could read partition as int64")
-		}
-		partition = int32(partition64)
-	} else {
-		return "", 0, 0, errors.New("Could not find topic in Message metadata")
-	}
-	if val, ok := msg.Metadata[messageOffset]; ok {
-		var err error
-		offset, err = binary.ReadVarint(bytes.NewReader(val))
-		if err != nil {
-			return "", 0, 0, errors.New("Could read offset as int64")
-		}
-	} else {
-		return "", 0, 0, errors.New("Could not find topic in Message metadata")
-	}
-	return topic, partition, offset, nil
-}
-
-// GetProducer gets the sarama producer. Used fro testing only
-func (km *KafkaMessenger) GetProducer() sarama.SyncProducer {
+// GetProducer gets the sarama producer. Used for testing only
+func (km *KafkaMessenger) getProducer() sarama.SyncProducer {
 	return km.producer
 }

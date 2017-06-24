@@ -6,17 +6,17 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"reflect"
-
 	"os"
+	"reflect"
 
 	"github.com/cayleygraph/cayley"
 	"github.com/cayleygraph/cayley/graph"
 	_ "github.com/cayleygraph/cayley/graph/bolt"
-	_ "github.com/cayleygraph/cayley/graph/sql" // Need for Cayley to connect to database
-	"github.com/cayleygraph/cayley/quad"
+	_ "github.com/cayleygraph/cayley/graph/sql"
+	"github.com/cayleygraph/cayley/quad" // Need for Cayley to connect to database
 	"github.com/cayleygraph/cayley/schema"
-	"github.com/edfungus/conduction/pb"
+	"github.com/edfungus/conduction/messenger"
+	"github.com/edfungus/conduction/router"
 	"github.com/sirupsen/logrus"
 )
 
@@ -24,15 +24,15 @@ import (
 var Logger = logrus.New()
 
 type Storage interface {
-	SaveFlow(flow pb.Flow) (Key, error)
-	GetFlowByKey(key Key) (pb.Flow, error)
+	SaveFlow(flow router.Flow) (Key, error)
+	GetFlowByKey(key Key) (router.Flow, error)
 
-	SavePath(path pb.Path) (Key, error)
-	GetPathByKey(key Key) (pb.Path, error)
-	GetKeyOfPath(path pb.Path) (Key, error)
+	SavePath(path messenger.Path) (Key, error)
+	GetPathByKey(key Key) (messenger.Path, error)
+	GetKeyOfPath(path messenger.Path) (Key, error)
 
 	ChainNextFlowToPath(flowKey Key, pathKey Key) error
-	GetNextFlows(key Key) ([]pb.Flow, error)
+	GetNextFlows(key Key) ([]router.Flow, error)
 }
 
 const (
@@ -73,7 +73,7 @@ func NewPathDTO(id quad.IRI, route string, pathType string, flows []quad.IRI) pa
 }
 
 // SaveFlow adds a new Flow to the graph. If the Path does not exist, it will be added, else it will be made
-func (gs *GraphStorage) SaveFlow(flow pb.Flow) (Key, error) {
+func (gs *GraphStorage) SaveFlow(flow router.Flow) (Key, error) {
 	pathKey, err := gs.SavePath(*flow.Path)
 	if err != nil {
 		return Key{}, err
@@ -88,24 +88,24 @@ func (gs *GraphStorage) SaveFlow(flow pb.Flow) (Key, error) {
 }
 
 // GetFlowByKey returns a Flow of the sepcified uuid from the graph
-func (gs *GraphStorage) GetFlowByKey(key Key) (pb.Flow, error) {
+func (gs *GraphStorage) GetFlowByKey(key Key) (router.Flow, error) {
 	var flowDTO flowDTO
 	err := schema.LoadTo(nil, gs.store, &flowDTO, key.QuadValue())
 	if err != nil {
-		return pb.Flow{}, err
+		return router.Flow{}, err
 	}
 	pathKey, err := NewKeyFromQuadIRI(flowDTO.Path)
 	if err != nil {
-		return pb.Flow{}, err
+		return router.Flow{}, err
 	}
 	path, err := gs.GetPathByKey(pathKey)
 	if err != nil {
-		return pb.Flow{}, err
+		return router.Flow{}, err
 	}
-	return pb.Flow{
+	return router.Flow{
 		Name:        flowDTO.Name,
 		Description: flowDTO.Description,
-		Path: &pb.Path{
+		Path: &messenger.Path{
 			Route: path.Route,
 			Type:  path.Type,
 		},
@@ -113,7 +113,7 @@ func (gs *GraphStorage) GetFlowByKey(key Key) (pb.Flow, error) {
 }
 
 // SavePath adds path to graph if new, else it will return the id of the existing path. Path are unique based on route and type combined
-func (gs *GraphStorage) SavePath(path pb.Path) (Key, error) {
+func (gs *GraphStorage) SavePath(path messenger.Path) (Key, error) {
 	pathExists, err := gs.doesPathExists(path)
 	if err != nil {
 		return Key{}, err
@@ -131,7 +131,7 @@ func (gs *GraphStorage) SavePath(path pb.Path) (Key, error) {
 }
 
 // GetKeyOfPath returns the Key of a given Path if it exists
-func (gs *GraphStorage) GetKeyOfPath(path pb.Path) (Key, error) {
+func (gs *GraphStorage) GetKeyOfPath(path messenger.Path) (Key, error) {
 	pathDTOList, err := gs.getPathDTOsByRouteAndType(path.Route, path.Type)
 	if err != nil {
 		return Key{}, err
@@ -151,13 +151,13 @@ func (gs *GraphStorage) GetKeyOfPath(path pb.Path) (Key, error) {
 }
 
 // GetPathByKey returns Path based on uuid.
-func (gs *GraphStorage) GetPathByKey(key Key) (pb.Path, error) {
+func (gs *GraphStorage) GetPathByKey(key Key) (messenger.Path, error) {
 	var pathDTO pathDTO
 	err := schema.LoadTo(nil, gs.store, &pathDTO, key.QuadValue())
 	if err != nil {
-		return pb.Path{}, err
+		return messenger.Path{}, err
 	}
-	return pb.Path{
+	return messenger.Path{
 		Route: pathDTO.Route,
 		Type:  pathDTO.Type,
 	}, nil
@@ -181,12 +181,12 @@ func (gs *GraphStorage) ChainNextFlowToPath(flowKey Key, pathKey Key) error {
 }
 
 // GetNextFlows returns a list of Flows that are triggers by the Flow
-func (gs *GraphStorage) GetNextFlows(key Key) ([]pb.Flow, error) {
+func (gs *GraphStorage) GetNextFlows(key Key) ([]router.Flow, error) {
 	flowKeyList, err := gs.getKeysTriggeredByKey(key)
 	if err != nil {
 		return nil, err
 	}
-	var flowList []pb.Flow
+	var flowList []router.Flow
 	for _, v := range flowKeyList {
 		flow, err := gs.GetFlowByKey(v)
 		if err != nil {
@@ -197,7 +197,7 @@ func (gs *GraphStorage) GetNextFlows(key Key) ([]pb.Flow, error) {
 	return flowList, nil
 }
 
-func (gs *GraphStorage) doesPathExists(path pb.Path) (bool, error) {
+func (gs *GraphStorage) doesPathExists(path messenger.Path) (bool, error) {
 	pathDTOList, err := gs.getPathDTOsByRouteAndType(path.Route, path.Type)
 	if err != nil {
 		return false, nil

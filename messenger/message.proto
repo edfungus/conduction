@@ -1,5 +1,5 @@
 syntax="proto3";
-package pb;
+package messenger;
 
 // Message is passed between connectors and Conduction 
 // A Message should not have origin AND destination. Origin will be in Messages from connectors to Conduction and destination will be from Conduction to connectors
@@ -11,19 +11,10 @@ message Message {
     map<string, bytes> metadata = 5;       
 }
 
+
 message Path {
     string route = 1;                   // Describes what path/topic/queue 
     string type = 2;                    // Describes what type of connector
     string identity = 3;                // (Transient)
     map<string, bytes> metadata = 4;    // (Transient) Extra storage for connector specific metadata but should not be critical in identifying uniqueness of path
-}
-
-message Flow {
-    // int64 id = 1; // REMOVE ME?
-    string name = 1;
-    string description = 2;
-    Path path = 3;
-    // repeated Flow dependentFlows = 4; 
-    // bool wait = 6;
-    // bool listen = 7;
 }

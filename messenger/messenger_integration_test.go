@@ -1,4 +1,4 @@
-// +build all integration
+// +build all integration work
 
 package messenger
 
@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
-
-	"github.com/edfungus/conduction/pb"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -40,7 +38,7 @@ var _ = Describe("Conduction", func() {
 		Describe("Given Kafka is connected", func() {
 			var (
 				messenger *KafkaMessenger
-				message   = &pb.Message{
+				message   = &Message{
 					Payload: []byte("payload"),
 				}
 			)
@@ -49,6 +47,7 @@ var _ = Describe("Conduction", func() {
 				messenger, err = NewKafkaMessenger(kafkaBroker, config)
 				Expect(err).To(BeNil())
 				Expect(messenger).ToNot(BeNil())
+				messenger.Start()
 			})
 			AfterEach(func() {
 				err := messenger.Close()
@@ -76,7 +75,7 @@ var _ = Describe("Conduction", func() {
 			})
 			Context("When an invalid message was sent to Kafka", func() {
 				It("Then the message should be skipped and nothing received", func() {
-					producer := messenger.GetProducer()
+					producer := messenger.getProducer()
 					producer.SendMessage(&sarama.ProducerMessage{
 						Topic: kafkaInputTopic,
 						Value: sarama.ByteEncoder("This message is not of type Message"),

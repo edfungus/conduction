@@ -1,11 +1,10 @@
-// +build all integration work
+// +build all integration
 
 package storage
 
 import (
 	"github.com/cayleygraph/cayley"
 	"github.com/cayleygraph/cayley/quad"
-	"github.com/edfungus/conduction/pb"
 	uuid "github.com/satori/go.uuid"
 
 	. "github.com/onsi/ginkgo"
@@ -59,10 +58,10 @@ var _ = Describe("Conduction", func() {
 		Describe("Given saving a Flow to graph", func() {
 			Context("When the Path does not exist", func() {
 				It("Then the Path and Flow should also be inserted connected to Path", func() {
-					flow := pb.Flow{
+					flow := router.Flow{
 						Name:        "Flow Name",
 						Description: "Flow Description",
-						Path: &pb.Path{
+						Path: &messager.Path{
 							Route: "/test2",
 							Type:  "mqtt-duplicate",
 						},
@@ -84,7 +83,7 @@ var _ = Describe("Conduction", func() {
 					// Save Path
 					pathRoute := "/test"
 					pathType := "mqtt-duplicate"
-					path := pb.Path{
+					path := messager.Path{
 						Route: pathRoute,
 						Type:  pathType,
 					}
@@ -93,10 +92,10 @@ var _ = Describe("Conduction", func() {
 					Expect(pathKey).ToNot(Equal(Key{}))
 
 					// Save flow with same path route and type
-					flow := pb.Flow{
+					flow := router.Flow{
 						Name:        "Flow Name",
 						Description: "Flow Description",
-						Path: &pb.Path{
+						Path: &messager.Path{
 							Route: path.Route,
 							Type:  path.Type,
 						},
@@ -127,7 +126,7 @@ var _ = Describe("Conduction", func() {
 					// Path to save
 					pathRoute := "/unique/path"
 					pathType := "mqtt-duplicate"
-					path := pb.Path{
+					path := messager.Path{
 						Route: pathRoute,
 						Type:  pathType,
 					}
@@ -157,7 +156,7 @@ var _ = Describe("Conduction", func() {
 					// Path to save
 					pathRoute := "/unique/path"
 					pathType := "mqtt-unique"
-					path := pb.Path{
+					path := messager.Path{
 						Route: pathRoute,
 						Type:  pathType,
 					}
@@ -191,7 +190,7 @@ var _ = Describe("Conduction", func() {
 					// Save Path
 					pathTriggerRoute := "/test"
 					pathTriggerType := "path-trigger"
-					pathTrigger := pb.Path{
+					pathTrigger := messager.Path{
 						Route: pathTriggerRoute,
 						Type:  pathTriggerType,
 					}
@@ -200,10 +199,10 @@ var _ = Describe("Conduction", func() {
 					Expect(pathTriggerKey).ToNot(Equal(Key{}))
 
 					// Save Flow
-					flow := pb.Flow{
+					flow := router.Flow{
 						Name:        "Flow Name",
 						Description: "Flow Description",
-						Path: &pb.Path{
+						Path: &messager.Path{
 							Route: "/some-route",
 							Type:  "mqtt",
 						},
@@ -229,7 +228,7 @@ var _ = Describe("Conduction", func() {
 					// Save Path
 					pathTriggerRoute := "/test"
 					pathTriggerType := "path-trigger"
-					pathTrigger := pb.Path{
+					pathTrigger := messager.Path{
 						Route: pathTriggerRoute,
 						Type:  pathTriggerType,
 					}
@@ -238,10 +237,10 @@ var _ = Describe("Conduction", func() {
 					Expect(pathTriggerKey).ToNot(Equal(uuid.Nil))
 
 					// Save both Flows
-					flow := pb.Flow{
+					flow := router.Flow{
 						Name:        "Flow Name",
 						Description: "Flow Description",
-						Path: &pb.Path{
+						Path: &messager.Path{
 							Route: "/some-route",
 							Type:  "mqtt",
 						},
@@ -281,7 +280,7 @@ var _ = Describe("Conduction", func() {
 					// Save Path
 					pathTriggerRoute := "/test"
 					pathTriggerType := "path-trigger"
-					pathTrigger := pb.Path{
+					pathTrigger := messager.Path{
 						Route: pathTriggerRoute,
 						Type:  pathTriggerType,
 					}
@@ -290,10 +289,10 @@ var _ = Describe("Conduction", func() {
 					Expect(pathTriggerKey).ToNot(Equal(Key{}))
 
 					// Save Flow
-					flow := pb.Flow{
+					flow := router.Flow{
 						Name:        "Flow Name",
 						Description: "Flow Description",
-						Path: &pb.Path{
+						Path: &messager.Path{
 							Route: "/some-route",
 							Type:  "mqtt",
 						},
@@ -316,7 +315,7 @@ var _ = Describe("Conduction", func() {
 					// Save Path
 					pathTriggerRoute := "/test"
 					pathTriggerType := "path-trigger"
-					pathTrigger := pb.Path{
+					pathTrigger := messager.Path{
 						Route: pathTriggerRoute,
 						Type:  pathTriggerType,
 					}
@@ -325,10 +324,10 @@ var _ = Describe("Conduction", func() {
 					Expect(pathTriggerKey).ToNot(Equal(Key{}))
 
 					// Save both Flows
-					flow := pb.Flow{
+					flow := router.Flow{
 						Name:        "Flow Name",
 						Description: "Flow Description",
-						Path: &pb.Path{
+						Path: &messager.Path{
 							Route: "/some-route",
 							Type:  "mqtt",
 						},

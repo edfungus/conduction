@@ -4,7 +4,6 @@ package messenger
 
 import (
 	"github.com/Shopify/sarama"
-	"github.com/edfungus/conduction/pb"
 	"github.com/golang/protobuf/proto"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -13,7 +12,7 @@ import (
 var _ = Describe("Conduction", func() {
 	Describe("Messenger", func() {
 		var (
-			message *pb.Message = &pb.Message{
+			message *Message = &Message{
 				Payload: []byte("payload"),
 			}
 			topic string = "topic"
@@ -37,10 +36,10 @@ var _ = Describe("Conduction", func() {
 						Offset:    offset,
 					}
 
-					msg := &pb.Message{}
-					setMessageMetadata(sm, msg)
+					msg := &Message{}
+					msg.SetMetadataFromConsumerMessage(sm)
 
-					newTopic, newPartition, newOffset, err := getMessageMetadata(msg)
+					newTopic, newPartition, newOffset, err := msg.getTopicPartitionOffsetFromMessageMetadata()
 					Expect(err).To(BeNil())
 					Expect(newTopic).To(Equal(topic))
 					Expect(newPartition).To(Equal(partition))
@@ -60,11 +59,11 @@ var _ = Describe("Conduction", func() {
 						Partition: partition,
 						Offset:    offset,
 					}
-					msg, err := convertMessage(sm)
+					msg, err := NewMessageFromSaramaConsumerMessage(sm)
 					Expect(err).To(BeNil())
 					Expect(msg.Payload).To(Equal(message.Payload))
 
-					newTopic, newPartition, newOffset, err := getMessageMetadata(msg)
+					newTopic, newPartition, newOffset, err := msg.getTopicPartitionOffsetFromMessageMetadata()
 					Expect(err).To(BeNil())
 					Expect(newTopic).To(Equal(topic))
 					Expect(newPartition).To(Equal(partition))
@@ -78,13 +77,13 @@ var _ = Describe("Conduction", func() {
 						Value: badMessage,
 					}
 
-					_, err := convertMessage(sm)
+					_, err := NewMessageFromSaramaConsumerMessage(sm)
 					Expect(err).ToNot(BeNil())
 				})
 			})
 		})
 		Describe("Given a Message to get kafka metadata from", func() {
-			var messageToRead *pb.Message
+			var messageToRead *Message
 			BeforeEach(func() {
 				serialized, err := proto.Marshal(message)
 				Expect(err).To(BeNil())
@@ -95,13 +94,13 @@ var _ = Describe("Conduction", func() {
 					Partition: partition,
 					Offset:    offset,
 				}
-				messageToRead, err = convertMessage(sm)
+				messageToRead, err = NewMessageFromSaramaConsumerMessage(sm)
 				Expect(err).To(BeNil())
 				Expect(messageToRead).ToNot(BeNil())
 			})
 			Context("When all fields are valid and present", func() {
 				It("Then the topic, partition and offset should return correctly", func() {
-					newTopic, newPartition, newOffset, err := getMessageMetadata(messageToRead)
+					newTopic, newPartition, newOffset, err := messageToRead.getTopicPartitionOffsetFromMessageMetadata()
 					Expect(err).To(BeNil())
 					Expect(newTopic).To(Equal(topic))
 					Expect(newPartition).To(Equal(partition))
@@ -111,28 +110,28 @@ var _ = Describe("Conduction", func() {
 			Context("When topic is not present", func() {
 				It("Then an error should be returned regarding topic", func() {
 					delete(messageToRead.Metadata, messageTopic)
-					_, _, _, err := getMessageMetadata(messageToRead)
+					_, _, _, err := messageToRead.getTopicPartitionOffsetFromMessageMetadata()
 					Expect(err).ToNot(BeNil())
 				})
 			})
 			Context("When partition is not present", func() {
 				It("Then an error should be returned regarding partition", func() {
 					delete(messageToRead.Metadata, messagePartition)
-					_, _, _, err := getMessageMetadata(messageToRead)
+					_, _, _, err := messageToRead.getTopicPartitionOffsetFromMessageMetadata()
 					Expect(err).ToNot(BeNil())
 				})
 			})
 			Context("When offset is not present", func() {
 				It("Then an error should be returned regarding offset", func() {
 					delete(messageToRead.Metadata, messageOffset)
-					_, _, _, err := getMessageMetadata(messageToRead)
+					_, _, _, err := messageToRead.getTopicPartitionOffsetFromMessageMetadata()
 					Expect(err).ToNot(BeNil())
 				})
 			})
 			Context("When the metadata map is nil", func() {
 				It("Then an error should be returned", func() {
 					messageToRead.Metadata = nil
-					_, _, _, err := getMessageMetadata(messageToRead)
+					_, _, _, err := messageToRead.getTopicPartitionOffsetFromMessageMetadata()
 					Expect(err).ToNot(BeNil())
 				})
 			})
