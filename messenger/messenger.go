@@ -37,28 +37,31 @@ type KafkaMessengerConfig struct {
 
 // NewKafkaMessenger returns a new KafkaMessenger
 func NewKafkaMessenger(broker string, config *KafkaMessengerConfig) (*KafkaMessenger, error) {
-	kafkaProducerConfig := newKafkaProducerConfig()
-	kafkaProducer, err := sarama.NewSyncProducer([]string{broker}, kafkaProducerConfig)
-	if err != nil {
-		return nil, err
-	}
-
 	kafkaConsumerConfig := newKafkaConsumerConfig()
 	kafkaConsumer, err := cluster.NewConsumer([]string{broker}, config.ConsumerGroup, []string{config.InputTopic}, kafkaConsumerConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	return &KafkaMessenger{
+	kafkaProducerConfig := newKafkaProducerConfig()
+	kafkaProducer, err := sarama.NewSyncProducer([]string{broker}, kafkaProducerConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	km := &KafkaMessenger{
 		producer: kafkaProducer,
 		consumer: kafkaConsumer,
 		messages: make(chan *Message),
 		stop:     make(chan bool, 1),
-	}, nil
+	}
+	km.startConsuming()
+
+	return km, nil
 }
 
 // Start begins listening to the messages coming into the topics
-func (km *KafkaMessenger) Start() {
+func (km *KafkaMessenger) startConsuming() {
 	go listen(km.consumer, km.messages, km.stop)
 }
 
@@ -120,6 +123,7 @@ func listen(consumer *cluster.Consumer, messages chan *Message, stop chan bool) 
 	for {
 		select {
 		case msg := <-consumer.Messages():
+
 			message, err := NewMessageFromSaramaConsumerMessage(msg)
 			if err != nil {
 				Logger.Debugln(err)

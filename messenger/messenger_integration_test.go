@@ -47,7 +47,6 @@ var _ = Describe("Conduction", func() {
 				messenger, err = NewKafkaMessenger(kafkaBroker, config)
 				Expect(err).To(BeNil())
 				Expect(messenger).ToNot(BeNil())
-				messenger.Start()
 			})
 			AfterEach(func() {
 				err := messenger.Close()

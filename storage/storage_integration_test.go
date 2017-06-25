@@ -5,6 +5,8 @@ package storage
 import (
 	"github.com/cayleygraph/cayley"
 	"github.com/cayleygraph/cayley/quad"
+	"github.com/edfungus/conduction/messenger"
+	"github.com/edfungus/conduction/router"
 	uuid "github.com/satori/go.uuid"
 
 	. "github.com/onsi/ginkgo"
@@ -61,7 +63,7 @@ var _ = Describe("Conduction", func() {
 					flow := router.Flow{
 						Name:        "Flow Name",
 						Description: "Flow Description",
-						Path: &messager.Path{
+						Path: &messenger.Path{
 							Route: "/test2",
 							Type:  "mqtt-duplicate",
 						},
@@ -83,7 +85,7 @@ var _ = Describe("Conduction", func() {
 					// Save Path
 					pathRoute := "/test"
 					pathType := "mqtt-duplicate"
-					path := messager.Path{
+					path := messenger.Path{
 						Route: pathRoute,
 						Type:  pathType,
 					}
@@ -95,7 +97,7 @@ var _ = Describe("Conduction", func() {
 					flow := router.Flow{
 						Name:        "Flow Name",
 						Description: "Flow Description",
-						Path: &messager.Path{
+						Path: &messenger.Path{
 							Route: path.Route,
 							Type:  path.Type,
 						},
@@ -126,7 +128,7 @@ var _ = Describe("Conduction", func() {
 					// Path to save
 					pathRoute := "/unique/path"
 					pathType := "mqtt-duplicate"
-					path := messager.Path{
+					path := messenger.Path{
 						Route: pathRoute,
 						Type:  pathType,
 					}
@@ -156,7 +158,7 @@ var _ = Describe("Conduction", func() {
 					// Path to save
 					pathRoute := "/unique/path"
 					pathType := "mqtt-unique"
-					path := messager.Path{
+					path := messenger.Path{
 						Route: pathRoute,
 						Type:  pathType,
 					}
@@ -190,7 +192,7 @@ var _ = Describe("Conduction", func() {
 					// Save Path
 					pathTriggerRoute := "/test"
 					pathTriggerType := "path-trigger"
-					pathTrigger := messager.Path{
+					pathTrigger := messenger.Path{
 						Route: pathTriggerRoute,
 						Type:  pathTriggerType,
 					}
@@ -202,7 +204,7 @@ var _ = Describe("Conduction", func() {
 					flow := router.Flow{
 						Name:        "Flow Name",
 						Description: "Flow Description",
-						Path: &messager.Path{
+						Path: &messenger.Path{
 							Route: "/some-route",
 							Type:  "mqtt",
 						},
@@ -228,7 +230,7 @@ var _ = Describe("Conduction", func() {
 					// Save Path
 					pathTriggerRoute := "/test"
 					pathTriggerType := "path-trigger"
-					pathTrigger := messager.Path{
+					pathTrigger := messenger.Path{
 						Route: pathTriggerRoute,
 						Type:  pathTriggerType,
 					}
@@ -240,7 +242,7 @@ var _ = Describe("Conduction", func() {
 					flow := router.Flow{
 						Name:        "Flow Name",
 						Description: "Flow Description",
-						Path: &messager.Path{
+						Path: &messenger.Path{
 							Route: "/some-route",
 							Type:  "mqtt",
 						},
@@ -280,7 +282,7 @@ var _ = Describe("Conduction", func() {
 					// Save Path
 					pathTriggerRoute := "/test"
 					pathTriggerType := "path-trigger"
-					pathTrigger := messager.Path{
+					pathTrigger := messenger.Path{
 						Route: pathTriggerRoute,
 						Type:  pathTriggerType,
 					}
@@ -292,7 +294,7 @@ var _ = Describe("Conduction", func() {
 					flow := router.Flow{
 						Name:        "Flow Name",
 						Description: "Flow Description",
-						Path: &messager.Path{
+						Path: &messenger.Path{
 							Route: "/some-route",
 							Type:  "mqtt",
 						},
@@ -315,7 +317,7 @@ var _ = Describe("Conduction", func() {
 					// Save Path
 					pathTriggerRoute := "/test"
 					pathTriggerType := "path-trigger"
-					pathTrigger := messager.Path{
+					pathTrigger := messenger.Path{
 						Route: pathTriggerRoute,
 						Type:  pathTriggerType,
 					}
@@ -327,7 +329,7 @@ var _ = Describe("Conduction", func() {
 					flow := router.Flow{
 						Name:        "Flow Name",
 						Description: "Flow Description",
-						Path: &messager.Path{
+						Path: &messenger.Path{
 							Route: "/some-route",
 							Type:  "mqtt",
 						},

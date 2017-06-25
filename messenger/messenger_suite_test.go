@@ -38,7 +38,6 @@ func ClearKafkaTopic(broker string, topic string, consumerGroup string) {
 		panic(fmt.Sprintf("Could not connec to Kafka. Is Kafka running on %s? Error: %s", broker, err.Error()))
 	}
 	defer messenger.Close()
-	messenger.Start()
 
 	// Send dummy message
 	err = messenger.Send(topic, &Message{
