@@ -11,7 +11,6 @@ import (
 
 // Messenger orchestrates communication between conduction modules
 type Messenger interface {
-	Start()
 	Send(topic string, msg Message) error
 	Receive() <-chan Message
 	Acknowledge(Message) error
@@ -27,18 +26,18 @@ type KafkaMessenger struct {
 	consumer *cluster.Consumer
 
 	messages chan *Message
-	stop     chan bool
+	close    chan bool
 }
 
 type KafkaMessengerConfig struct {
-	ConsumerGroup string
-	InputTopic    string
+	ConsumerGroup   string
+	TopicsToConsume []string
 }
 
 // NewKafkaMessenger returns a new KafkaMessenger
 func NewKafkaMessenger(broker string, config *KafkaMessengerConfig) (*KafkaMessenger, error) {
 	kafkaConsumerConfig := newKafkaConsumerConfig()
-	kafkaConsumer, err := cluster.NewConsumer([]string{broker}, config.ConsumerGroup, []string{config.InputTopic}, kafkaConsumerConfig)
+	kafkaConsumer, err := cluster.NewConsumer([]string{broker}, config.ConsumerGroup, config.TopicsToConsume, kafkaConsumerConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +52,7 @@ func NewKafkaMessenger(broker string, config *KafkaMessengerConfig) (*KafkaMesse
 		producer: kafkaProducer,
 		consumer: kafkaConsumer,
 		messages: make(chan *Message),
-		stop:     make(chan bool, 1),
+		close:    make(chan bool, 1),
 	}
 	km.startConsuming()
 
@@ -62,7 +61,7 @@ func NewKafkaMessenger(broker string, config *KafkaMessengerConfig) (*KafkaMesse
 
 // Start begins listening to the messages coming into the topics
 func (km *KafkaMessenger) startConsuming() {
-	go listen(km.consumer, km.messages, km.stop)
+	go listen(km.consumer, km.messages, km.close)
 }
 
 // Send sends messages to Kafka
@@ -95,7 +94,7 @@ func (km *KafkaMessenger) Acknowledge(message *Message) error {
 
 // Close stops the Kafka Messenger from sending and receiving messages
 func (km *KafkaMessenger) Close() error {
-	km.stop <- true
+	km.close <- true
 	time.Sleep(time.Second * 1)
 	err := km.producer.Close()
 	if err != nil {

@@ -1,4 +1,4 @@
-package router
+package storage
 
 import "github.com/edfungus/conduction/messenger"
 

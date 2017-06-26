@@ -16,7 +16,6 @@ import (
 	"github.com/cayleygraph/cayley/quad" // Need for Cayley to connect to database
 	"github.com/cayleygraph/cayley/schema"
 	"github.com/edfungus/conduction/messenger"
-	"github.com/edfungus/conduction/router"
 	"github.com/sirupsen/logrus"
 )
 
@@ -24,15 +23,15 @@ import (
 var Logger = logrus.New()
 
 type Storage interface {
-	SaveFlow(flow router.Flow) (Key, error)
-	GetFlowByKey(key Key) (router.Flow, error)
+	SaveFlow(flow Flow) (Key, error)
+	GetFlowByKey(key Key) (Flow, error)
 
 	SavePath(path messenger.Path) (Key, error)
 	GetPathByKey(key Key) (messenger.Path, error)
 	GetKeyOfPath(path messenger.Path) (Key, error)
 
 	ChainNextFlowToPath(flowKey Key, pathKey Key) error
-	GetNextFlows(key Key) ([]router.Flow, error)
+	GetNextFlows(key Key) ([]Flow, error)
 }
 
 const (
@@ -73,7 +72,7 @@ func NewPathDTO(id quad.IRI, route string, pathType string, flows []quad.IRI) pa
 }
 
 // SaveFlow adds a new Flow to the graph. If the Path does not exist, it will be added, else it will be made
-func (gs *GraphStorage) SaveFlow(flow router.Flow) (Key, error) {
+func (gs *GraphStorage) SaveFlow(flow Flow) (Key, error) {
 	pathKey, err := gs.SavePath(*flow.Path)
 	if err != nil {
 		return Key{}, err
@@ -88,21 +87,21 @@ func (gs *GraphStorage) SaveFlow(flow router.Flow) (Key, error) {
 }
 
 // GetFlowByKey returns a Flow of the sepcified uuid from the graph
-func (gs *GraphStorage) GetFlowByKey(key Key) (router.Flow, error) {
+func (gs *GraphStorage) GetFlowByKey(key Key) (Flow, error) {
 	var flowDTO flowDTO
 	err := schema.LoadTo(nil, gs.store, &flowDTO, key.QuadValue())
 	if err != nil {
-		return router.Flow{}, err
+		return Flow{}, err
 	}
 	pathKey, err := NewKeyFromQuadIRI(flowDTO.Path)
 	if err != nil {
-		return router.Flow{}, err
+		return Flow{}, err
 	}
 	path, err := gs.GetPathByKey(pathKey)
 	if err != nil {
-		return router.Flow{}, err
+		return Flow{}, err
 	}
-	return router.Flow{
+	return Flow{
 		Name:        flowDTO.Name,
 		Description: flowDTO.Description,
 		Path: &messenger.Path{
@@ -181,12 +180,12 @@ func (gs *GraphStorage) ChainNextFlowToPath(flowKey Key, pathKey Key) error {
 }
 
 // GetNextFlows returns a list of Flows that are triggers by the Flow
-func (gs *GraphStorage) GetNextFlows(key Key) ([]router.Flow, error) {
+func (gs *GraphStorage) GetNextFlows(key Key) ([]Flow, error) {
 	flowKeyList, err := gs.getKeysTriggeredByKey(key)
 	if err != nil {
 		return nil, err
 	}
-	var flowList []router.Flow
+	var flowList []Flow
 	for _, v := range flowKeyList {
 		flow, err := gs.GetFlowByKey(v)
 		if err != nil {

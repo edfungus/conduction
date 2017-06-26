@@ -6,7 +6,6 @@ import (
 	"github.com/cayleygraph/cayley"
 	"github.com/cayleygraph/cayley/quad"
 	"github.com/edfungus/conduction/messenger"
-	"github.com/edfungus/conduction/router"
 	uuid "github.com/satori/go.uuid"
 
 	. "github.com/onsi/ginkgo"
@@ -60,7 +59,7 @@ var _ = Describe("Conduction", func() {
 		Describe("Given saving a Flow to graph", func() {
 			Context("When the Path does not exist", func() {
 				It("Then the Path and Flow should also be inserted connected to Path", func() {
-					flow := router.Flow{
+					flow := Flow{
 						Name:        "Flow Name",
 						Description: "Flow Description",
 						Path: &messenger.Path{
@@ -94,7 +93,7 @@ var _ = Describe("Conduction", func() {
 					Expect(pathKey).ToNot(Equal(Key{}))
 
 					// Save flow with same path route and type
-					flow := router.Flow{
+					flow := Flow{
 						Name:        "Flow Name",
 						Description: "Flow Description",
 						Path: &messenger.Path{
@@ -201,7 +200,7 @@ var _ = Describe("Conduction", func() {
 					Expect(pathTriggerKey).ToNot(Equal(Key{}))
 
 					// Save Flow
-					flow := router.Flow{
+					flow := Flow{
 						Name:        "Flow Name",
 						Description: "Flow Description",
 						Path: &messenger.Path{
@@ -239,7 +238,7 @@ var _ = Describe("Conduction", func() {
 					Expect(pathTriggerKey).ToNot(Equal(uuid.Nil))
 
 					// Save both Flows
-					flow := router.Flow{
+					flow := Flow{
 						Name:        "Flow Name",
 						Description: "Flow Description",
 						Path: &messenger.Path{
@@ -291,7 +290,7 @@ var _ = Describe("Conduction", func() {
 					Expect(pathTriggerKey).ToNot(Equal(Key{}))
 
 					// Save Flow
-					flow := router.Flow{
+					flow := Flow{
 						Name:        "Flow Name",
 						Description: "Flow Description",
 						Path: &messenger.Path{
@@ -326,7 +325,7 @@ var _ = Describe("Conduction", func() {
 					Expect(pathTriggerKey).ToNot(Equal(Key{}))
 
 					// Save both Flows
-					flow := router.Flow{
+					flow := Flow{
 						Name:        "Flow Name",
 						Description: "Flow Description",
 						Path: &messenger.Path{

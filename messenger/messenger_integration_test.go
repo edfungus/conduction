@@ -14,8 +14,8 @@ var _ = Describe("Conduction", func() {
 	Describe("Messenger", func() {
 		var (
 			config = &KafkaMessengerConfig{
-				ConsumerGroup: kafkaConsumerGroup,
-				InputTopic:    kafkaInputTopic,
+				ConsumerGroup:   kafkaConsumerGroup,
+				TopicsToConsume: []string{kafkaInputTopic},
 			}
 		)
 		Describe("Given creating a new Messenger", func() {

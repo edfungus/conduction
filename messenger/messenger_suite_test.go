@@ -31,8 +31,8 @@ func TestMessenger(t *testing.T) {
 
 func ClearKafkaTopic(broker string, topic string, consumerGroup string) {
 	messenger, err := NewKafkaMessenger(broker, &KafkaMessengerConfig{
-		ConsumerGroup: consumerGroup,
-		InputTopic:    topic,
+		ConsumerGroup:   consumerGroup,
+		TopicsToConsume: []string{topic},
 	})
 	if err != nil {
 		panic(fmt.Sprintf("Could not connec to Kafka. Is Kafka running on %s? Error: %s", broker, err.Error()))
