@@ -11,9 +11,9 @@ import (
 
 // Messenger orchestrates communication between conduction modules
 type Messenger interface {
-	Send(topic string, msg Message) error
+	Send(topic string, message Message) error
 	Receive() <-chan Message
-	Acknowledge(Message) error
+	Acknowledge(message Message) error
 	Close() error
 }
 

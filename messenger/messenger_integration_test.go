@@ -1,4 +1,4 @@
-// +build all integration work
+// +build all integration
 
 package messenger
 

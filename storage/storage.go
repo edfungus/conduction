@@ -71,6 +71,56 @@ func NewPathDTO(id quad.IRI, route string, pathType string, flows []quad.IRI) pa
 	}
 }
 
+type GraphStorageConfig struct {
+	Host         string
+	Port         int
+	User         string
+	DatabaseName string
+	DatabaseType string
+}
+
+// GetDatabaseConnectionPath returns a constructed URL from the database details in config
+func (gsc GraphStorageConfig) GetDatabaseConnectionPath() string {
+	return fmt.Sprintf(databaseURL, gsc.User, gsc.Host, gsc.Port, gsc.DatabaseName)
+}
+
+type GraphStorage struct {
+	store   *cayley.Handle
+	tmpFile *os.File
+}
+
+// NewGraphStorage returns a new Storage that uses Cayley and CockroachDB
+func NewGraphStorage(config GraphStorageConfig) (*GraphStorage, error) {
+	err := setupDatabaseForGraphStore(config)
+	if err != nil {
+		return nil, err
+	}
+	store, err := cayley.NewGraph("sql", config.GetDatabaseConnectionPath(), graph.Options{"flavor": config.DatabaseType})
+	if err != nil {
+		return nil, err
+	}
+	return &GraphStorage{
+		store: store,
+	}, nil
+}
+
+// NewGraphStorageBolt allows graph to be stored in a file instead sql above. This is to dodge the issue with inserting a struct of optional or empty array in to the graph (postgres issue: https://github.com/cayleygraph/cayley/issues/563)
+func NewGraphStorageBolt() (*GraphStorage, error) {
+	tmpfile, err := ioutil.TempFile("./", "example")
+	if err != nil {
+		log.Fatal(err)
+	}
+	graph.InitQuadStore("bolt", tmpfile.Name(), nil)
+	store, err := cayley.NewGraph("bolt", tmpfile.Name(), nil)
+	if err != nil {
+		return nil, err
+	}
+	return &GraphStorage{
+		store:   store,
+		tmpFile: tmpfile,
+	}, nil
+}
+
 // SaveFlow adds a new Flow to the graph. If the Path does not exist, it will be added, else it will be made
 func (gs *GraphStorage) SaveFlow(flow Flow) (Key, error) {
 	pathKey, err := gs.SavePath(*flow.Path)
@@ -254,56 +304,6 @@ func (gs *GraphStorage) writeToGraph(dto interface{}) error {
 		return err
 	}
 	return nil
-}
-
-type GraphStorageConfig struct {
-	Host         string
-	Port         int
-	User         string
-	DatabaseName string
-	DatabaseType string
-}
-
-// GetDatabaseConnectionPath returns a constructed URL from the database details in config
-func (gsc GraphStorageConfig) GetDatabaseConnectionPath() string {
-	return fmt.Sprintf(databaseURL, gsc.User, gsc.Host, gsc.Port, gsc.DatabaseName)
-}
-
-type GraphStorage struct {
-	store   *cayley.Handle
-	tmpFile *os.File
-}
-
-// NewGraphStorage returns a new Storage that uses Cayley and CockroachDB
-func NewGraphStorage(config GraphStorageConfig) (*GraphStorage, error) {
-	err := setupDatabaseForGraphStore(config)
-	if err != nil {
-		return nil, err
-	}
-	store, err := cayley.NewGraph("sql", config.GetDatabaseConnectionPath(), graph.Options{"flavor": config.DatabaseType})
-	if err != nil {
-		return nil, err
-	}
-	return &GraphStorage{
-		store: store,
-	}, nil
-}
-
-// NewGraphStorageBolt allows graph to be stored in a file instead sql above. This is to dodge the issue with inserting a struct of optional or empty array in to the graph (postgres issue: https://github.com/cayleygraph/cayley/issues/563)
-func NewGraphStorageBolt() (*GraphStorage, error) {
-	tmpfile, err := ioutil.TempFile("./", "example")
-	if err != nil {
-		log.Fatal(err)
-	}
-	graph.InitQuadStore("bolt", tmpfile.Name(), nil)
-	store, err := cayley.NewGraph("bolt", tmpfile.Name(), nil)
-	if err != nil {
-		return nil, err
-	}
-	return &GraphStorage{
-		store:   store,
-		tmpFile: tmpfile,
-	}, nil
 }
 
 // Close ends graph database session. Currently, it will delete temporary database file if used
