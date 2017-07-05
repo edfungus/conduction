@@ -19,10 +19,10 @@ var _ = Describe("Conduction", func() {
 			mockStorage   *mockStorage
 			mockMessenger *mockMessenger
 		)
-
+		typeKeyREST := "REST"
 		topicNames := map[string]string{
-			"REST": "restTopic",
-			"MQTT": "mqttTopic",
+			typeKeyREST: "restTopic",
+			"MQTT":      "mqttTopic",
 		}
 		config := RouterConfig{
 			TopicNames: topicNames,
@@ -89,13 +89,8 @@ var _ = Describe("Conduction", func() {
 
 			Context("When finding topic name for existing type", func() {
 				It("Then the corresponding topic name should be returned", func() {
-					var existingTypeKey string
-					for k := range topicNames {
-						existingTypeKey = k
-					}
-
-					topic, err := router.getTopicForPathType(existingTypeKey)
-					Expect(topic).To(Equal(topicNames[existingTypeKey]))
+					topic, err := router.getTopicForPathType(typeKeyREST)
+					Expect(topic).To(Equal(topicNames[typeKeyREST]))
 					Expect(err).To(BeNil())
 				})
 			})
@@ -103,6 +98,65 @@ var _ = Describe("Conduction", func() {
 				It("Then an error should be thrown", func() {
 					_, err := router.getTopicForPathType("typeThatDoesNotExist")
 					Expect(err).ToNot(BeNil())
+				})
+			})
+		})
+		Describe("Given a message to be forwarded to a Path", func() {
+			router := NewRouter(mockMessenger, mockStorage, config)
+			messageToBeForwarded := messenger.Message{
+				Origin: &messenger.Path{
+					Route: "/test",
+					Type:  "Origin type doesn't matter",
+				},
+				Payload: []byte("payload"),
+			}
+
+			Context("When the Path has a valid type", func() {
+				It("Then a message should be sent to the right topic with the Path in destination property", func() {
+					destinationToBeForwardedTo := messenger.Path{
+						Route: "/pass",
+						Type:  typeKeyREST,
+					}
+					mockSend = func(topic string, message messenger.Message) error {
+						Expect(topic).To(Equal(topicNames[destinationToBeForwardedTo.Type]))
+						Expect(*message.Destination).To(Equal(destinationToBeForwardedTo))
+						return nil
+					}
+
+					err := router.forwardMessageToPath(messageToBeForwarded, destinationToBeForwardedTo)
+					Expect(err).To(BeNil())
+				})
+			})
+			Context("When the Path has a invalid type", func() {
+				It("Then a message should be not be sent and an error returned", func() {
+					badDestinationToBeForwardedTo := messenger.Path{
+						Route: "/pass",
+						Type:  "badType",
+					}
+					mockSend = func(topic string, message messenger.Message) error {
+						Fail("Send should not have been called")
+						return nil
+					}
+
+					err := router.forwardMessageToPath(messageToBeForwarded, badDestinationToBeForwardedTo)
+					Expect(err).ToNot(BeNil())
+				})
+			})
+			Context("When the Path is incomplete", func() {
+				It("Then a message should be not be sent and an error returned", func() {
+					incompleteDestinationToBeForwardedTo := messenger.Path{}
+					mockSend = func(topic string, message messenger.Message) error {
+						Fail("Send should not have been called")
+						return nil
+					}
+
+					err := router.forwardMessageToPath(messageToBeForwarded, incompleteDestinationToBeForwardedTo)
+					Expect(err).ToNot(BeNil())
+				})
+			})
+			Context("Cleanup", func() {
+				It("Cleanup mock functions", func() {
+					mockSend = nil
 				})
 			})
 		})
@@ -177,7 +231,7 @@ func (ms *mockStorage) GetNextFlows(key storage.Key) ([]storage.Flow, error) {
 
 type mockMessenger struct{}
 
-var mockSend func(topic string, msg messenger.Message) error
+var mockSend func(topic string, message messenger.Message) error
 var mockReceive func() <-chan messenger.Message
 var mockAcknowledge func(messenger.Message) error
 var mockClose func() error
