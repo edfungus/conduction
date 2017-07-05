@@ -66,6 +66,17 @@ var _ = Describe("Conduction", func() {
 					}
 				})
 			})
+			Context("When Router is stopped", func() {
+				It("Then the Router should stop receiving messages", func() {
+					router.Stop()
+					select {
+					case <-ackCalled:
+						Fail("Message should not have been received")
+					case <-time.After(time.Second * 1):
+						return
+					}
+				})
+			})
 			Context("Cleanup", func() {
 				It("Cleanup mock functions", func() {
 					mockAcknowledge = nil
