@@ -10,7 +10,7 @@ import (
 	"github.com/edfungus/conduction/storage"
 
 	. "github.com/onsi/ginkgo"
-	// . "github.com/onsi/gomega"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Conduction", func() {
@@ -81,6 +81,28 @@ var _ = Describe("Conduction", func() {
 				It("Cleanup mock functions", func() {
 					mockAcknowledge = nil
 					mockReceive = nil
+				})
+			})
+		})
+		Describe("Given Router has a map of type to topic name", func() {
+			router := NewRouter(mockMessenger, mockStorage, config)
+
+			Context("When finding topic name for existing type", func() {
+				It("Then the corresponding topic name should be returned", func() {
+					var existingTypeKey string
+					for k := range topicNames {
+						existingTypeKey = k
+					}
+
+					topic, err := router.getTopicForPathType(existingTypeKey)
+					Expect(topic).To(Equal(topicNames[existingTypeKey]))
+					Expect(err).To(BeNil())
+				})
+			})
+			Context("When finding topic name for non-existing type", func() {
+				It("Then an error should be thrown", func() {
+					_, err := router.getTopicForPathType("typeThatDoesNotExist")
+					Expect(err).ToNot(BeNil())
 				})
 			})
 		})
