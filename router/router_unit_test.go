@@ -160,6 +160,85 @@ var _ = Describe("Conduction", func() {
 				})
 			})
 		})
+		Describe("Given a message is to be processed", func() {
+			router := NewRouter(mockMessenger, mockStorage, config)
+			messageToBeForwarded := messenger.Message{
+				Origin: &messenger.Path{
+					Route: "/test",
+					Type:  "Origin type doesn't matter",
+				},
+				Payload: []byte("payload"),
+			}
+			Context("When the message has next Flows", func() {
+				It("Then the message should be forwarded to the next Flows and original message acknowledged", func() {
+					mockGetKeyOfPath = func(path messenger.Path) (storage.Key, error) {
+						return storage.Key{}, nil
+					}
+					flow1 := storage.Flow{
+						Path: &messenger.Path{
+							Route: "/test1",
+							Type:  typeKeyREST,
+						},
+					}
+					flow2 := storage.Flow{
+						Path: &messenger.Path{
+							Route: "/test2",
+							Type:  typeKeyREST,
+						},
+					}
+					nextFlowArray := []storage.Flow{flow1, flow2}
+					mockGetNextFlows = func(key storage.Key) ([]storage.Flow, error) {
+						return nextFlowArray, nil
+					}
+					acknowledgeCalled := 0
+					mockAcknowledge = func(message messenger.Message) error {
+						acknowledgeCalled++
+						return nil
+					}
+					mockSendCalled := 0
+					mockSend = func(topic string, message messenger.Message) error {
+						mockSendCalled++
+						return nil
+					}
+
+					err := router.processMessage(messageToBeForwarded)
+					Expect(err).To(BeNil())
+					Expect(acknowledgeCalled).To(Equal(1))
+					Expect(mockSendCalled).To(Equal(2))
+				})
+			})
+			Context("When the message has no next Flows", func() {
+				It("Then no messages should be forwarded and original message acknowledged", func() {
+					mockGetKeyOfPath = func(path messenger.Path) (storage.Key, error) {
+						return storage.Key{}, nil
+					}
+					nextFlowArray := []storage.Flow{}
+					mockGetNextFlows = func(key storage.Key) ([]storage.Flow, error) {
+						return nextFlowArray, nil
+					}
+					acknowledgeCalled := 0
+					mockAcknowledge = func(message messenger.Message) error {
+						acknowledgeCalled++
+						return nil
+					}
+					mockSendCalled := 0
+					mockSend = func(topic string, message messenger.Message) error {
+						mockSendCalled++
+						return nil
+					}
+
+					err := router.processMessage(messageToBeForwarded)
+					Expect(err).To(BeNil())
+					Expect(acknowledgeCalled).To(Equal(1))
+					Expect(mockSendCalled).To(Equal(0))
+				})
+			})
+			Context("Cleanup", func() {
+				It("Cleanup mock functions", func() {
+					mockSend = nil
+				})
+			})
+		})
 	})
 })
 

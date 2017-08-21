@@ -70,7 +70,6 @@ func (r *Router) startRouting() {
 	}
 }
 
-// TODO: test me
 func (r *Router) processMessage(message messenger.Message) (err error) {
 	defer func() {
 		switch {
@@ -90,10 +89,9 @@ func (r *Router) processMessage(message messenger.Message) (err error) {
 		return
 	}
 	err = r.forwardMessageToFlows(message, nextFlows)
-	return
+	return err
 }
 
-// TODO: probabl should test
 func (r *Router) getNextFlowsForMessage(message messenger.Message) ([]storage.Flow, error) {
 	if message.Origin == nil {
 		return nil, errors.New("Message does not have an origin property")
