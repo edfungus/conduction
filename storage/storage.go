@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"reflect"
@@ -85,8 +84,7 @@ func (gsc GraphStorageConfig) GetDatabaseConnectionPath() string {
 }
 
 type GraphStorage struct {
-	store   *cayley.Handle
-	tmpFile *os.File
+	store *cayley.Handle
 }
 
 // NewGraphStorage returns a new Storage that uses Cayley and CockroachDB
@@ -105,8 +103,8 @@ func NewGraphStorage(config GraphStorageConfig) (*GraphStorage, error) {
 }
 
 // NewGraphStorageBolt allows graph to be stored in a file instead sql above. This is to dodge the issue with inserting a struct of optional or empty array in to the graph (postgres issue: https://github.com/cayleygraph/cayley/issues/563)
-func NewGraphStorageBolt() (*GraphStorage, error) {
-	tmpfile, err := ioutil.TempFile("./", "example")
+func NewGraphStorageBolt(filepath string) (*GraphStorage, error) {
+	tmpfile, err := os.Open(filepath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -116,8 +114,7 @@ func NewGraphStorageBolt() (*GraphStorage, error) {
 		return nil, err
 	}
 	return &GraphStorage{
-		store:   store,
-		tmpFile: tmpfile,
+		store: store,
 	}, nil
 }
 
@@ -308,9 +305,6 @@ func (gs *GraphStorage) writeToGraph(dto interface{}) error {
 
 // Close ends graph database session. Currently, it will delete temporary database file if used
 func (gs *GraphStorage) Close() {
-	if gs.tmpFile != nil {
-		os.Remove(gs.tmpFile.Name())
-	}
 	gs.store.Close()
 }
 

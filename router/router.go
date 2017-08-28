@@ -64,7 +64,7 @@ func (r *Router) startRouting() {
 		case <-r.stop:
 			<-r.start
 		case message := <-r.messenger.Receive():
-			err := r.processMessage(message)
+			err := r.processMessage(*message)
 			Logger.Debugln(err)
 		}
 	}
@@ -74,9 +74,9 @@ func (r *Router) processMessage(message messenger.Message) (err error) {
 	defer func() {
 		switch {
 		case err == nil:
-			err = r.messenger.Acknowledge(message)
+			err = r.messenger.Acknowledge(&message)
 		default:
-			r.messenger.Acknowledge(message)
+			r.messenger.Acknowledge(&message)
 		}
 	}()
 
@@ -119,7 +119,7 @@ func (r *Router) forwardMessageToPath(message messenger.Message, destinationPath
 	if err != nil {
 		return err
 	}
-	err = r.messenger.Send(topic, message)
+	err = r.messenger.Send(topic, &message)
 	return err
 }
 

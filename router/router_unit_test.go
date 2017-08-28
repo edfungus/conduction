@@ -31,19 +31,19 @@ var _ = Describe("Conduction", func() {
 		Describe("Given creating a new Router", func() {
 			var router *Router
 			ackCalled := make(chan bool)
-			mockAcknowledge = func(messenger.Message) error {
+			mockAcknowledge = func(*messenger.Message) error {
 				ackCalled <- true
 				return nil
 			}
-			messageInChannel := make(chan messenger.Message)
-			mockReceive = func() <-chan messenger.Message {
+			messageInChannel := make(chan *messenger.Message)
+			mockReceive = func() <-chan *messenger.Message {
 				return messageInChannel
 			}
 
 			Context("When a new Router is returned", func() {
 				It("Then the Router should be returned not started", func() {
 					go func() {
-						message := messenger.Message{}
+						message := &messenger.Message{}
 						messageInChannel <- message
 					}()
 					router = NewRouter(mockMessenger, mockStorage, config)
@@ -117,7 +117,7 @@ var _ = Describe("Conduction", func() {
 						Route: "/pass",
 						Type:  typeKeyREST,
 					}
-					mockSend = func(topic string, message messenger.Message) error {
+					mockSend = func(topic string, message *messenger.Message) error {
 						Expect(topic).To(Equal(topicNames[destinationToBeForwardedTo.Type]))
 						Expect(*message.Destination).To(Equal(destinationToBeForwardedTo))
 						return nil
@@ -133,7 +133,7 @@ var _ = Describe("Conduction", func() {
 						Route: "/pass",
 						Type:  "badType",
 					}
-					mockSend = func(topic string, message messenger.Message) error {
+					mockSend = func(topic string, message *messenger.Message) error {
 						Fail("Send should not have been called")
 						return nil
 					}
@@ -145,7 +145,7 @@ var _ = Describe("Conduction", func() {
 			Context("When the Path is incomplete", func() {
 				It("Then a message should be not be sent and an error returned", func() {
 					incompleteDestinationToBeForwardedTo := messenger.Path{}
-					mockSend = func(topic string, message messenger.Message) error {
+					mockSend = func(topic string, message *messenger.Message) error {
 						Fail("Send should not have been called")
 						return nil
 					}
@@ -191,12 +191,12 @@ var _ = Describe("Conduction", func() {
 						return nextFlowArray, nil
 					}
 					acknowledgeCalled := 0
-					mockAcknowledge = func(message messenger.Message) error {
+					mockAcknowledge = func(message *messenger.Message) error {
 						acknowledgeCalled++
 						return nil
 					}
 					mockSendCalled := 0
-					mockSend = func(topic string, message messenger.Message) error {
+					mockSend = func(topic string, message *messenger.Message) error {
 						mockSendCalled++
 						return nil
 					}
@@ -217,12 +217,12 @@ var _ = Describe("Conduction", func() {
 						return nextFlowArray, nil
 					}
 					acknowledgeCalled := 0
-					mockAcknowledge = func(message messenger.Message) error {
+					mockAcknowledge = func(message *messenger.Message) error {
 						acknowledgeCalled++
 						return nil
 					}
 					mockSendCalled := 0
-					mockSend = func(topic string, message messenger.Message) error {
+					mockSend = func(topic string, message *messenger.Message) error {
 						mockSendCalled++
 						return nil
 					}
@@ -310,12 +310,12 @@ func (ms *mockStorage) GetNextFlows(key storage.Key) ([]storage.Flow, error) {
 
 type mockMessenger struct{}
 
-var mockSend func(topic string, message messenger.Message) error
-var mockReceive func() <-chan messenger.Message
-var mockAcknowledge func(messenger.Message) error
+var mockSend func(topic string, message *messenger.Message) error
+var mockReceive func() <-chan *messenger.Message
+var mockAcknowledge func(*messenger.Message) error
 var mockClose func() error
 
-func (mm *mockMessenger) Send(topic string, message messenger.Message) error {
+func (mm *mockMessenger) Send(topic string, message *messenger.Message) error {
 	if mockSend == nil {
 		fmt.Println("Send not implemented")
 		return nil
@@ -323,7 +323,7 @@ func (mm *mockMessenger) Send(topic string, message messenger.Message) error {
 	return mockSend(topic, message)
 }
 
-func (mm *mockMessenger) Receive() <-chan messenger.Message {
+func (mm *mockMessenger) Receive() <-chan *messenger.Message {
 	if mockReceive == nil {
 		fmt.Println("Receive not implemented")
 		return nil
@@ -331,7 +331,7 @@ func (mm *mockMessenger) Receive() <-chan messenger.Message {
 	return mockReceive()
 }
 
-func (mm *mockMessenger) Acknowledge(message messenger.Message) error {
+func (mm *mockMessenger) Acknowledge(message *messenger.Message) error {
 	if mockAcknowledge == nil {
 		fmt.Println("Acknowledge not implemented")
 		return nil

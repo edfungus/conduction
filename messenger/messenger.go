@@ -11,9 +11,9 @@ import (
 
 // Messenger orchestrates communication between conduction modules
 type Messenger interface {
-	Send(topic string, message Message) error
-	Receive() <-chan Message
-	Acknowledge(message Message) error
+	Send(topic string, message *Message) error
+	Receive() <-chan *Message
+	Acknowledge(message *Message) error
 	Close() error
 }
 
@@ -122,7 +122,6 @@ func listen(consumer *cluster.Consumer, messages chan *Message, stop chan bool) 
 	for {
 		select {
 		case msg := <-consumer.Messages():
-
 			message, err := NewMessageFromSaramaConsumerMessage(msg)
 			if err != nil {
 				Logger.Debugln(err)

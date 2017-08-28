@@ -1,3 +1,5 @@
 conduction
 
 .idea/*
+storage/test_db.tmp
+database.bolt

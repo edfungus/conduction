@@ -3,13 +3,14 @@
 package storage
 
 import (
+	"os"
+
 	"github.com/cayleygraph/cayley"
 	"github.com/cayleygraph/cayley/quad"
 	"github.com/edfungus/conduction/messenger"
-	uuid "github.com/satori/go.uuid"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	uuid "github.com/satori/go.uuid"
 )
 
 var _ = Describe("Conduction", func() {
@@ -26,12 +27,14 @@ var _ = Describe("Conduction", func() {
 		)
 		BeforeEach(func() {
 			var err error
-			graph, err = NewGraphStorageBolt()
+			os.Create(tempFilePath)
+			graph, err = NewGraphStorageBolt(tempFilePath)
 			Expect(err).To(BeNil())
 			Expect(graph).ToNot(BeNil())
 		})
 		AfterEach(func() {
 			graph.Close()
+			os.Remove(tempFilePath)
 		})
 		Describe("Given creating a new Storage", func() {
 			Context("When Cockroach path is wrong or not available", func() {
@@ -50,9 +53,12 @@ var _ = Describe("Conduction", func() {
 			})
 			Context("When Cockroach path is correct and available", func() {
 				It("Then GraphStorage should return without error", func() {
-					graph, err := NewGraphStorageBolt()
+					tempFilePathForTest := "test_db_test.tmp"
+					os.Create(tempFilePathForTest)
+					graph, err := NewGraphStorageBolt(tempFilePathForTest)
 					Expect(err).To(BeNil())
 					Expect(graph).ToNot(BeNil())
+					os.Remove(tempFilePathForTest)
 				})
 			})
 		})

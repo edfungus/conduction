@@ -19,6 +19,7 @@ const (
 var (
 	databaseHost = "localhost" // Override with DATABASE_HOST if necessary
 	databasePort = 26257       // Override with DATABASE_PORT if necessary
+	tempFilePath = "./test_db.tmp"
 )
 
 func TestStorage(t *testing.T) {
