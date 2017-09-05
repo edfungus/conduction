@@ -37,6 +37,10 @@ const (
 	databaseURL string = "postgresql://%s@%s:%d/%s?sslmode=disable"
 )
 
+var (
+	ErrFlowCannotBeRetrieved error = fmt.Errorf("Could not retrieve Flow from storage")
+)
+
 type flowDTO struct {
 	ID          quad.IRI `quad:"@id"`
 	Name        string   `quad:"name"`
@@ -138,7 +142,7 @@ func (gs *GraphStorage) GetFlowByKey(key Key) (Flow, error) {
 	var flowDTO flowDTO
 	err := schema.LoadTo(nil, gs.store, &flowDTO, key.QuadValue())
 	if err != nil {
-		return Flow{}, err
+		return Flow{}, ErrFlowCannotBeRetrieved
 	}
 	pathKey, err := NewKeyFromQuadIRI(flowDTO.Path)
 	if err != nil {

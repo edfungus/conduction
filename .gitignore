@@ -1,4 +1,4 @@
-conduction
+cmd/conduction/conduction
 
 .idea/*
 storage/test_db.tmp

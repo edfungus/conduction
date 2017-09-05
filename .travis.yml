@@ -23,5 +23,7 @@ before_install:
   - go get -v github.com/onsi/ginkgo/ginkgo
 
 script:
-  - go build ./...
+  - cd cmd/conduction
+  - go build
+  - cd ../..
   - ginkgo -r -tags all

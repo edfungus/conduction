@@ -1,9 +1,12 @@
 package main
 
 import (
+	"log"
+	"net/http"
 	"os"
 	"os/signal"
 
+	"github.com/edfungus/conduction/admin"
 	"github.com/edfungus/conduction/messenger"
 	"github.com/edfungus/conduction/router"
 	"github.com/edfungus/conduction/storage"
@@ -18,7 +21,7 @@ func main() {
 
 	messengerConfig := &messenger.KafkaMessengerConfig{
 		ConsumerGroup:   "conduction",
-		TopicsToConsume: []string{"REST-topic", "MQTT-topic"},
+		TopicsToConsume: []string{"KAFKA-topic"},
 	}
 	messenger, err := messenger.NewKafkaMessenger("localhost:9092", messengerConfig)
 	if err != nil {
@@ -36,6 +39,9 @@ func main() {
 	}
 	router := router.NewRouter(messenger, storage, routerConfig)
 	go router.Start()
+
+	admin := admin.NewAdmin(storage)
+	go log.Fatal(http.ListenAndServe(":8080", admin.Router))
 
 	signalChan := make(chan os.Signal, 1)
 	exitReady := make(chan bool, 1)
