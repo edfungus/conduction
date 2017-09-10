@@ -39,6 +39,7 @@ const (
 
 var (
 	ErrFlowCannotBeRetrieved error = fmt.Errorf("Could not retrieve Flow from storage")
+	ErrPathCannotBeRetrieved error = fmt.Errorf("Could not retrieve Path from storage")
 )
 
 type flowDTO struct {
@@ -205,7 +206,7 @@ func (gs *GraphStorage) GetPathByKey(key Key) (messenger.Path, error) {
 	var pathDTO pathDTO
 	err := schema.LoadTo(nil, gs.store, &pathDTO, key.QuadValue())
 	if err != nil {
-		return messenger.Path{}, err
+		return messenger.Path{}, ErrPathCannotBeRetrieved
 	}
 	return messenger.Path{
 		Route: pathDTO.Route,

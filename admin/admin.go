@@ -6,12 +6,15 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/edfungus/conduction/messenger"
+
 	"github.com/edfungus/conduction/storage"
 	"github.com/gorilla/mux"
 )
 
 const (
 	flowIDPathVariable = "flowID"
+	pathIDPathVariable = "pathID"
 )
 
 type Admin struct {
@@ -35,8 +38,8 @@ func NewAdmin(storage storage.Storage) *Admin {
 	r.HandleFunc(fmt.Sprintf("/flows/{%s}", flowIDPathVariable), admin.getFlowByID).Methods("GET")
 
 	// r.HandleFunc("/paths", getPaths).Methods("GET") // low priority
-	// r.HandleFunc("/paths", postPath).Methods("POST")
-	// r.HandleFunc("/paths/{uuid}", getPath).Methods("GET")
+	r.HandleFunc("/paths", admin.postPath).Methods("POST")
+	r.HandleFunc(fmt.Sprintf("/paths/{%s}", pathIDPathVariable), admin.getPathByID).Methods("GET")
 	// r.HandleFunc("/paths/{uuid}/flows", getFlowsFromPath).Methods("GET")
 	// r.HandleFunc("/paths/{uuid}/flows/{uuid}", addFlowToPath).Methods("POST")
 	// r.HandleFunc("/paths/{uuid}/flows/{uuid}", deleteFlowFromPath).Methods("DELETE")
@@ -69,7 +72,7 @@ func (a *Admin) postFlow(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Admin) getFlowByID(w http.ResponseWriter, r *http.Request) {
-	key, err := getKeyFromRequest(r)
+	key, err := getFlowKeyFromRequest(r)
 	if err != nil {
 		respondError(w, err.Error(), http.StatusBadRequest)
 		return
@@ -87,9 +90,58 @@ func (a *Admin) getFlowByID(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, string(response), http.StatusOK)
 }
 
-func getKeyFromRequest(r *http.Request) (storage.Key, error) {
+func (a *Admin) postPath(w http.ResponseWriter, r *http.Request) {
+	var path messenger.Path
+	err := getObjectFromRequestBody(r, &path)
+	if err != nil {
+		respondError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := validatePath(path); err != nil {
+		respondError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	key, err := a.Storage.SavePath(path)
+	if err != nil {
+		respondError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	response, err := json.Marshal(key)
+	if err != nil {
+		respondError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, string(response), http.StatusCreated)
+}
+
+func (a *Admin) getPathByID(w http.ResponseWriter, r *http.Request) {
+	key, err := getPathKeyFromRequest(r)
+	if err != nil {
+		respondError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	path, err := a.Storage.GetPathByKey(key)
+	if err != nil {
+		respondError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	response, err := json.Marshal(path)
+	if err != nil {
+		respondError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, string(response), http.StatusOK)
+}
+
+func getFlowKeyFromRequest(r *http.Request) (storage.Key, error) {
 	vars := mux.Vars(r)
 	id := vars[flowIDPathVariable]
+	return storage.NewKeyFromString(id)
+}
+
+func getPathKeyFromRequest(r *http.Request) (storage.Key, error) {
+	vars := mux.Vars(r)
+	id := vars[pathIDPathVariable]
 	return storage.NewKeyFromString(id)
 }
 

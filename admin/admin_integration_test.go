@@ -142,5 +142,81 @@ var _ = Describe("Admin", func() {
 				})
 			})
 		})
+		Describe("Given inserting a new Path", func() {
+			Context("When the Path is complete and correct", func() {
+				It("Then the Path will be inserted", func() {
+					body :=
+						`{
+							"route": "/test",
+							"type": "REST"
+						}`
+					req, _ := http.NewRequest("POST", "/paths", bytes.NewBufferString(body))
+					w := httptest.NewRecorder()
+					manager.Router.ServeHTTP(w, req)
+
+					Expect(w.Code).To(Equal(http.StatusCreated))
+					Expect(w.Body.String()).To(ContainSubstring("uuid"))
+				})
+			})
+			Context("When the Path is missing route", func() {
+				It("Then an error wil be retutned", func() {
+					body :=
+						`{
+							"type": "REST"
+						}`
+					req, _ := http.NewRequest("POST", "/paths", bytes.NewBufferString(body))
+					w := httptest.NewRecorder()
+					manager.Router.ServeHTTP(w, req)
+
+					Expect(w.Code).To(Equal(http.StatusBadRequest))
+					Expect(w.Body.String()).To(ContainSubstring("error"))
+				})
+			})
+		})
+		Describe("Given retieving a Path", func() {
+			Context("When the Path uuid exist", func() {
+				It("Then the Path will be returned", func() {
+					path := messenger.Path{
+						Route: "Test route",
+						Type:  "Test type",
+					}
+					pathID, err := manager.Storage.SavePath(path)
+					Expect(err).To(BeNil())
+
+					req, _ := http.NewRequest("GET", fmt.Sprintf("/paths/%s", pathID.String()), nil)
+					w := httptest.NewRecorder()
+					manager.Router.ServeHTTP(w, req)
+					Expect(w.Code).To(Equal(http.StatusOK))
+
+					var pathResponse messenger.Path
+					err = json.Unmarshal(w.Body.Bytes(), &pathResponse)
+					Expect(err).To(BeNil())
+					Expect(pathResponse.Route).To(Equal(path.Route))
+					Expect(pathResponse.Type).To(Equal(path.Type))
+				})
+			})
+			Context("When the Path uuid does not exist", func() {
+				It("Then an error will be returned", func() {
+					key := storage.NewRandomKey()
+					req, _ := http.NewRequest("GET", fmt.Sprintf("/paths/%s", key.String()), nil)
+					w := httptest.NewRecorder()
+					manager.Router.ServeHTTP(w, req)
+
+					Expect(w.Code).To(Equal(http.StatusNotFound))
+					Expect(w.Body.String()).To(ContainSubstring("Could not retrieve Path from storage"))
+				})
+			})
+			Context("When the Flow uuid is not a valid uuid", func() {
+				It("Then an error will be returned", func() {
+					key := "xxx-xxx-xxx-xxx-xxx"
+					req, _ := http.NewRequest("GET", fmt.Sprintf("/paths/%s", key), nil)
+					w := httptest.NewRecorder()
+					manager.Router.ServeHTTP(w, req)
+
+					Expect(w.Code).To(Equal(http.StatusBadRequest))
+					Expect(w.Body.String()).To(ContainSubstring("\"error\":\"uuid"))
+				})
+			})
+		})
 	})
 })
