@@ -40,7 +40,7 @@ func NewAdmin(storage storage.Storage) *Admin {
 	// r.HandleFunc("/paths", getPaths).Methods("GET") // low priority
 	r.HandleFunc("/paths", admin.postPath).Methods("POST")
 	r.HandleFunc(fmt.Sprintf("/paths/{%s}", pathIDPathVariable), admin.getPathByID).Methods("GET")
-	// r.HandleFunc("/paths/{uuid}/flows", getFlowsFromPath).Methods("GET")
+	r.HandleFunc(fmt.Sprintf("/paths/{%s}/flows", pathIDPathVariable), admin.getFlowsFromPath).Methods("GET")
 	// r.HandleFunc("/paths/{uuid}/flows/{uuid}", addFlowToPath).Methods("POST")
 	// r.HandleFunc("/paths/{uuid}/flows/{uuid}", deleteFlowFromPath).Methods("DELETE")
 
@@ -72,7 +72,7 @@ func (a *Admin) postFlow(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Admin) getFlowByID(w http.ResponseWriter, r *http.Request) {
-	key, err := getFlowKeyFromRequest(r)
+	key, err := getValueFromRequest(r, flowIDPathVariable)
 	if err != nil {
 		respondError(w, err.Error(), http.StatusBadRequest)
 		return
@@ -115,7 +115,7 @@ func (a *Admin) postPath(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Admin) getPathByID(w http.ResponseWriter, r *http.Request) {
-	key, err := getPathKeyFromRequest(r)
+	key, err := getValueFromRequest(r, pathIDPathVariable)
 	if err != nil {
 		respondError(w, err.Error(), http.StatusBadRequest)
 		return
@@ -133,15 +133,34 @@ func (a *Admin) getPathByID(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, string(response), http.StatusOK)
 }
 
-func getFlowKeyFromRequest(r *http.Request) (storage.Key, error) {
-	vars := mux.Vars(r)
-	id := vars[flowIDPathVariable]
-	return storage.NewKeyFromString(id)
+func (a *Admin) getFlowsFromPath(w http.ResponseWriter, r *http.Request) {
+	key, err := getValueFromRequest(r, pathIDPathVariable)
+	if err != nil {
+		respondError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	_, err = a.Storage.GetPathByKey(key)
+	if err != nil {
+		respondError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	flows, keys, err := a.Storage.GetNextFlows(key)
+	if err != nil {
+		respondError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	combineFlowList := storage.AddKeyToFlows(flows, keys)
+	response, err := json.Marshal(combineFlowList)
+	if err != nil {
+		respondError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, string(response), http.StatusOK)
 }
 
-func getPathKeyFromRequest(r *http.Request) (storage.Key, error) {
+func getValueFromRequest(r *http.Request, key string) (storage.Key, error) {
 	vars := mux.Vars(r)
-	id := vars[pathIDPathVariable]
+	id := vars[key]
 	return storage.NewKeyFromString(id)
 }
 

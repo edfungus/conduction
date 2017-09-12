@@ -127,7 +127,7 @@ var _ = Describe("Admin", func() {
 					manager.Router.ServeHTTP(w, req)
 
 					Expect(w.Code).To(Equal(http.StatusNotFound))
-					Expect(w.Body.String()).To(ContainSubstring("Could not retrieve Flow from storage"))
+					Expect(w.Body.String()).To(ContainSubstring(storage.ErrFlowCannotBeRetrieved.Error()))
 				})
 			})
 			Context("When the Flow uuid is not a valid uuid", func() {
@@ -203,7 +203,7 @@ var _ = Describe("Admin", func() {
 					manager.Router.ServeHTTP(w, req)
 
 					Expect(w.Code).To(Equal(http.StatusNotFound))
-					Expect(w.Body.String()).To(ContainSubstring("Could not retrieve Path from storage"))
+					Expect(w.Body.String()).To(ContainSubstring(storage.ErrPathCannotBeRetrieved.Error()))
 				})
 			})
 			Context("When the Flow uuid is not a valid uuid", func() {
@@ -215,6 +215,86 @@ var _ = Describe("Admin", func() {
 
 					Expect(w.Code).To(Equal(http.StatusBadRequest))
 					Expect(w.Body.String()).To(ContainSubstring("\"error\":\"uuid"))
+				})
+			})
+		})
+		Describe("Given retrieving next Flows from Path", func() {
+			Context("When the Path uuid exists and there are no Flows", func() {
+				It("Then Flows should be return with an empty array", func() {
+					path := messenger.Path{
+						Route: "Test route",
+						Type:  "Test type",
+					}
+					pathID, err := manager.Storage.SavePath(path)
+					Expect(err).To(BeNil())
+
+					req, _ := http.NewRequest("GET", fmt.Sprintf("/paths/%s/flows", pathID), nil)
+					w := httptest.NewRecorder()
+					manager.Router.ServeHTTP(w, req)
+
+					Expect(w.Code).To(Equal(http.StatusOK))
+					expectedEmptyFlows := storage.Flows{Flows: []storage.Flow{}}
+					expectEmptyFlowsBytes, err := json.Marshal(expectedEmptyFlows)
+					Expect(err).To(BeNil())
+					Expect(w.Body.Bytes()).To(Equal(expectEmptyFlowsBytes))
+				})
+			})
+			Context("When the Path uuid exists and there are next Flows", func() {
+				It("Then Flows should be return with the next Flows in an array", func() {
+					path := messenger.Path{
+						Route: "Test route",
+						Type:  "Test type",
+					}
+					pathID, err := manager.Storage.SavePath(path)
+					Expect(err).To(BeNil())
+
+					flow1 := storage.Flow{
+						Name:        "Test flow1",
+						Description: "Test description",
+						Path: &messenger.Path{
+							Route: "route 1",
+							Type:  "Test type",
+						},
+					}
+					flowID1, err := manager.Storage.SaveFlow(flow1)
+					Expect(err).To(BeNil())
+
+					flow2 := storage.Flow{
+						Name:        "Test flow2",
+						Description: "Test description",
+						Path: &messenger.Path{
+							Route: "route 2",
+							Type:  "Test type",
+						},
+					}
+					flowID2, err := manager.Storage.SaveFlow(flow2)
+					Expect(err).To(BeNil())
+
+					err = manager.Storage.ChainNextFlowToPath(flowID1, pathID)
+					Expect(err).To(BeNil())
+					err = manager.Storage.ChainNextFlowToPath(flowID2, pathID)
+					Expect(err).To(BeNil())
+
+					req, _ := http.NewRequest("GET", fmt.Sprintf("/paths/%s/flows", pathID), nil)
+					w := httptest.NewRecorder()
+					manager.Router.ServeHTTP(w, req)
+
+					Expect(w.Code).To(Equal(http.StatusOK))
+					var flowsResponse storage.Flows
+					err = json.Unmarshal(w.Body.Bytes(), &flowsResponse)
+					Expect(err).To(BeNil())
+					Expect(flowsResponse.Flows).To(HaveLen(2))
+				})
+			})
+			Context("When the Path uuid does not exist", func() {
+				It("Then an error should be thrown", func() {
+					key := storage.NewRandomKey()
+					req, _ := http.NewRequest("GET", fmt.Sprintf("/paths/%s/flows", key.String()), nil)
+					w := httptest.NewRecorder()
+					manager.Router.ServeHTTP(w, req)
+
+					Expect(w.Code).To(Equal(http.StatusNotFound))
+					Expect(w.Body.String()).To(ContainSubstring(storage.ErrPathCannotBeRetrieved.Error()))
 				})
 			})
 		})

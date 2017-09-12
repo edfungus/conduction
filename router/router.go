@@ -100,7 +100,8 @@ func (r *Router) getNextFlowsForMessage(message messenger.Message) ([]storage.Fl
 	if err != nil {
 		return nil, err
 	}
-	return r.storage.GetNextFlows(pathKey)
+	nextFlows, _, err := r.storage.GetNextFlows(pathKey)
+	return nextFlows, err
 }
 
 func (r *Router) forwardMessageToFlows(message messenger.Message, nextFlows []storage.Flow) error {

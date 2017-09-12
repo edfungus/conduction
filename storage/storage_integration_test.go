@@ -353,11 +353,13 @@ var _ = Describe("Conduction", func() {
 					Expect(err).To(BeNil())
 
 					// Get Flows
-					flows, err := graph.GetNextFlows(pathTriggerKey)
+					flows, keys, err := graph.GetNextFlows(pathTriggerKey)
 					Expect(err).To(BeNil())
 					Expect(len(flows)).To(Equal(2))
 					Expect(flows[0]).To(Equal(flow))
 					Expect(flows[1]).To(Equal(flow))
+					Expect(keys).To(ContainElement(flowKey1))
+					Expect(keys).To(ContainElement(flowKey2))
 				})
 			})
 		})

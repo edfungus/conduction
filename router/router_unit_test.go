@@ -187,8 +187,8 @@ var _ = Describe("Conduction", func() {
 						},
 					}
 					nextFlowArray := []storage.Flow{flow1, flow2}
-					mockGetNextFlows = func(key storage.Key) ([]storage.Flow, error) {
-						return nextFlowArray, nil
+					mockGetNextFlows = func(key storage.Key) ([]storage.Flow, []storage.Key, error) {
+						return nextFlowArray, nil, nil
 					}
 					acknowledgeCalled := 0
 					mockAcknowledge = func(message *messenger.Message) error {
@@ -213,8 +213,8 @@ var _ = Describe("Conduction", func() {
 						return storage.Key{}, nil
 					}
 					nextFlowArray := []storage.Flow{}
-					mockGetNextFlows = func(key storage.Key) ([]storage.Flow, error) {
-						return nextFlowArray, nil
+					mockGetNextFlows = func(key storage.Key) ([]storage.Flow, []storage.Key, error) {
+						return nextFlowArray, nil, nil
 					}
 					acknowledgeCalled := 0
 					mockAcknowledge = func(message *messenger.Message) error {
@@ -250,7 +250,7 @@ var mockSavePath func(path messenger.Path) (storage.Key, error)
 var mockGetPathByKey func(key storage.Key) (messenger.Path, error)
 var mockGetKeyOfPath func(path messenger.Path) (storage.Key, error)
 var mockChainNextFlowToPath func(flowKey storage.Key, pathKey storage.Key) error
-var mockGetNextFlows func(key storage.Key) ([]storage.Flow, error)
+var mockGetNextFlows func(key storage.Key) ([]storage.Flow, []storage.Key, error)
 
 func (ms *mockStorage) SaveFlow(flow storage.Flow) (storage.Key, error) {
 	if mockSaveFlow == nil {
@@ -300,10 +300,10 @@ func (ms *mockStorage) ChainNextFlowToPath(flowKey storage.Key, pathKey storage.
 	return mockChainNextFlowToPath(flowKey, pathKey)
 }
 
-func (ms *mockStorage) GetNextFlows(key storage.Key) ([]storage.Flow, error) {
+func (ms *mockStorage) GetNextFlows(key storage.Key) ([]storage.Flow, []storage.Key, error) {
 	if mockGetNextFlows == nil {
 		fmt.Println("GetNextFlows not implemented")
-		return nil, nil
+		return nil, nil, nil
 	}
 	return mockGetNextFlows(key)
 }

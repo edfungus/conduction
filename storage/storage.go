@@ -30,7 +30,7 @@ type Storage interface {
 	GetKeyOfPath(path messenger.Path) (Key, error)
 
 	ChainNextFlowToPath(flowKey Key, pathKey Key) error
-	GetNextFlows(key Key) ([]Flow, error)
+	GetNextFlows(key Key) ([]Flow, []Key, error)
 }
 
 const (
@@ -40,6 +40,7 @@ const (
 var (
 	ErrFlowCannotBeRetrieved error = fmt.Errorf("Could not retrieve Flow from storage")
 	ErrPathCannotBeRetrieved error = fmt.Errorf("Could not retrieve Path from storage")
+	ErrResolvingKey          error = fmt.Errorf("Error resolving key in database")
 )
 
 type flowDTO struct {
@@ -232,20 +233,20 @@ func (gs *GraphStorage) ChainNextFlowToPath(flowKey Key, pathKey Key) error {
 }
 
 // GetNextFlows returns a list of Flows that are triggers by the Flow
-func (gs *GraphStorage) GetNextFlows(key Key) ([]Flow, error) {
+func (gs *GraphStorage) GetNextFlows(key Key) ([]Flow, []Key, error) {
 	flowKeyList, err := gs.getKeysTriggeredByKey(key)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var flowList []Flow
 	for _, v := range flowKeyList {
 		flow, err := gs.GetFlowByKey(v)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		flowList = append(flowList, flow)
 	}
-	return flowList, nil
+	return flowList, flowKeyList, nil
 }
 
 func (gs *GraphStorage) doesPathExists(path messenger.Path) (bool, error) {
@@ -274,7 +275,7 @@ func (gs *GraphStorage) getKeysTriggeredByKey(key Key) ([]Key, error) {
 	p := cayley.StartPath(gs.store, key.QuadValue()).Out(quad.IRI("triggers"))
 	keyQuadList, err := p.Iterate(nil).AllValues(gs.store)
 	if err != nil {
-		return nil, err
+		return nil, ErrResolvingKey
 	}
 	keys, err := convertQuadValueListToKeyList(keyQuadList)
 	if err != nil {
